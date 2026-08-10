@@ -1,0 +1,495 @@
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Check, Clock3, Database, Footprints, Sparkles } from "lucide-react"
+import { toast } from "sonner"
+
+import { AppHeader } from "@/components/app-header"
+import { BrandMark } from "@/components/brand-mark"
+import { GeneratingCard } from "@/components/planner/generating-card"
+import { PlannerForm } from "@/components/planner/planner-form"
+import { PlannerSummary } from "@/components/planner/planner-summary"
+import { Badge } from "@/components/ui/badge"
+import { TripResult } from "@/components/trip/trip-result"
+import { planTrip } from "@/lib/planner"
+import {
+  DEFAULT_PLANNER_VALUES,
+  ORIGINS,
+  type AvoidKey,
+  type CompanionKey,
+  type PlannerValues,
+  type WantKey,
+} from "@/types/planner-ui"
+import type { TripPlan } from "@/types/trip"
+
+const SAVED_KEY = "zero-trip:saved-plans"
+
+interface SavedPlan {
+  id: string
+  title: string
+  savedAt: string
+  values: PlannerValues
+  variant: number
+  plan: TripPlan
+}
+
+function loadSavedPlans(): SavedPlan[] {
+  try {
+    const value = localStorage.getItem(SAVED_KEY)
+    const parsed = value ? (JSON.parse(value) as Partial<SavedPlan>[]) : []
+    return parsed.filter(
+      (item): item is SavedPlan =>
+        typeof item.id === "string" &&
+        typeof item.title === "string" &&
+        Boolean(item.values) &&
+        Boolean(item.plan),
+    )
+  } catch {
+    return []
+  }
+}
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds))
+
+function minuteToTime(value: number) {
+  const safeValue = Math.min(value, 24 * 60)
+  if (safeValue === 24 * 60) return "24:00"
+  return `${String(Math.floor(safeValue / 60)).padStart(2, "0")}:${String(safeValue % 60).padStart(2, "0")}`
+}
+
+function createTripPlan(values: PlannerValues, variant: number) {
+  return planTrip({
+    origin: { lat: values.lat, lng: values.lng, label: values.originLabel },
+    date: values.date,
+    startTime: minuteToTime(values.startMin),
+    endTime: minuteToTime(values.startMin + values.durationMin),
+    budgetWon: values.budget,
+    maxWalkingKm: values.maxWalkKm,
+    companion: values.companion,
+    wants: values.wants,
+    avoids: values.avoids,
+    partySize: 1,
+    variant,
+  })
+}
+
+const companions = new Set<CompanionKey>(["solo", "couple", "children", "parents", "pet"])
+const originKeys = new Set<PlannerValues["originKey"]>([
+  "cityhall",
+  "jongno",
+  "seongsu",
+  "yeouido",
+  "mangwon",
+  "current",
+])
+const wants = new Set<WantKey>([
+  "free",
+  "exhibition",
+  "night-view",
+  "walk",
+  "cafe",
+  "performance",
+  "park",
+  "culture",
+  "photo",
+  "rest",
+])
+const avoids = new Set<AvoidKey>([
+  "crowds",
+  "waiting",
+  "long-walk",
+  "outdoors",
+  "stairs",
+  "long-distance",
+])
+
+function loadSharedState(): { values: PlannerValues; variant: number; plan: TripPlan } | null {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("trip") !== "1") return null
+
+    const numberParam = (key: string, fallback: number) => {
+      const value = Number(params.get(key))
+      return Number.isFinite(value) ? value : fallback
+    }
+    const companionParam = params.get("companion") as CompanionKey | null
+    const wantsParam = params.get("wants")
+    const sharedWants = (wantsParam ?? "")
+      .split(",")
+      .filter((value): value is WantKey => wants.has(value as WantKey))
+    const sharedAvoids = (params.get("avoids") ?? "")
+      .split(",")
+      .filter((value): value is AvoidKey => avoids.has(value as AvoidKey))
+
+    const values: PlannerValues = {
+      ...DEFAULT_PLANNER_VALUES,
+      originKey: originKeys.has(params.get("originKey") as PlannerValues["originKey"])
+        ? (params.get("originKey") as PlannerValues["originKey"])
+        : DEFAULT_PLANNER_VALUES.originKey,
+      originLabel: params.get("originLabel") ?? DEFAULT_PLANNER_VALUES.originLabel,
+      lat: numberParam("lat", DEFAULT_PLANNER_VALUES.lat),
+      lng: numberParam("lng", DEFAULT_PLANNER_VALUES.lng),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "")
+        ? params.get("date")!
+        : DEFAULT_PLANNER_VALUES.date,
+      startMin: Math.min(21 * 60, Math.max(9 * 60, numberParam("start", DEFAULT_PLANNER_VALUES.startMin))),
+      durationMin: [180, 360, 540].includes(numberParam("duration", DEFAULT_PLANNER_VALUES.durationMin))
+        ? numberParam("duration", DEFAULT_PLANNER_VALUES.durationMin)
+        : DEFAULT_PLANNER_VALUES.durationMin,
+      budget: Math.min(50_000, Math.max(0, numberParam("budget", DEFAULT_PLANNER_VALUES.budget))),
+      maxWalkKm: Math.min(12, Math.max(2, numberParam("walk", DEFAULT_PLANNER_VALUES.maxWalkKm))),
+      companion:
+        companionParam && companions.has(companionParam)
+          ? companionParam
+          : DEFAULT_PLANNER_VALUES.companion,
+      wants: wantsParam === null ? DEFAULT_PLANNER_VALUES.wants : sharedWants,
+      avoids: sharedAvoids,
+    }
+    if (values.startMin + values.durationMin > 24 * 60) values.durationMin = 180
+    const variant = Math.max(0, Math.trunc(numberParam("variant", 0)))
+    return { values, variant, plan: createTripPlan(values, variant) }
+  } catch {
+    return null
+  }
+}
+
+function buildShareUrl(values: PlannerValues, variant: number) {
+  const nearestPublicOrigin =
+    values.originKey === "current"
+      ? [...ORIGINS].sort((left, right) => {
+          const leftDistance = (left.lat - values.lat) ** 2 + (left.lng - values.lng) ** 2
+          const rightDistance = (right.lat - values.lat) ** 2 + (right.lng - values.lng) ** 2
+          return leftDistance - rightDistance
+        })[0]
+      : null
+  const shareValues: PlannerValues = nearestPublicOrigin
+    ? {
+        ...values,
+        originKey: nearestPublicOrigin.key,
+        originLabel: nearestPublicOrigin.label,
+        lat: nearestPublicOrigin.lat,
+        lng: nearestPublicOrigin.lng,
+      }
+    : values
+  const url = new URL(window.location.href)
+  url.search = ""
+  const params = url.searchParams
+  params.set("trip", "1")
+  params.set("originKey", shareValues.originKey)
+  params.set("originLabel", shareValues.originLabel)
+  params.set("lat", String(shareValues.lat))
+  params.set("lng", String(shareValues.lng))
+  params.set("date", values.date)
+  params.set("start", String(values.startMin))
+  params.set("duration", String(values.durationMin))
+  params.set("budget", String(values.budget))
+  params.set("walk", String(values.maxWalkKm))
+  params.set("companion", values.companion)
+  params.set("wants", values.wants.join(","))
+  params.set("avoids", values.avoids.join(","))
+  params.set("variant", String(variant))
+  return { url: url.toString(), generalizedLocation: Boolean(nearestPublicOrigin) }
+}
+
+const sharedInitialState = loadSharedState()
+
+function App() {
+  const [values, setValues] = useState<PlannerValues>(
+    sharedInitialState?.values ?? DEFAULT_PLANNER_VALUES,
+  )
+  const [plan, setPlan] = useState<TripPlan | null>(sharedInitialState?.plan ?? null)
+  const [variant, setVariant] = useState(sharedInitialState?.variant ?? 0)
+  const [generating, setGenerating] = useState(false)
+  const [generationStage, setGenerationStage] = useState(0)
+  const [locating, setLocating] = useState(false)
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(loadSavedPlans)
+
+  const isSaved = useMemo(
+    () => Boolean(plan && savedPlans.some((savedPlan) => savedPlan.id === plan.id)),
+    [plan, savedPlans],
+  )
+
+  useEffect(() => {
+    if (!sharedInitialState) return
+    const timer = window.setTimeout(() => {
+      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const generateCourse = useCallback(
+    async (nextVariant = variant, requestValues = values) => {
+      if (generating) return
+      setGenerating(true)
+      setGenerationStage(0)
+
+      window.setTimeout(() => {
+        document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }, 80)
+
+      try {
+        await wait(320)
+        setGenerationStage(1)
+        await wait(340)
+        setGenerationStage(2)
+        await wait(420)
+
+        const nextPlan = createTripPlan(requestValues, nextVariant)
+
+        setPlan(nextPlan)
+        setGenerating(false)
+        window.setTimeout(() => {
+          document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          document.getElementById("result-title")?.focus({ preventScroll: true })
+        }, 80)
+      } catch (error) {
+        setGenerating(false)
+        console.error(error)
+        toast.error("코스를 만드는 중 문제가 생겼어요.", {
+          description: "조건을 확인한 뒤 다시 시도해 주세요.",
+        })
+      }
+    },
+    [generating, values, variant],
+  )
+
+  const handleRegenerate = () => {
+    const nextVariant = variant + 1
+    setVariant(nextVariant)
+    if (plan?.stops.length === 0) {
+      const relaxedValues: PlannerValues = {
+        ...values,
+        maxWalkKm: Math.min(12, values.maxWalkKm + 2),
+        avoids: values.avoids.filter(
+          (avoid) => !["long-walk", "long-distance", "outdoors"].includes(avoid),
+        ),
+      }
+      setValues(relaxedValues)
+      toast("조건을 조금 넓혀 다시 찾을게요.", {
+        description: `최대 도보 ${relaxedValues.maxWalkKm}km · 인접 야외 장소 허용`,
+      })
+      void generateCourse(nextVariant, relaxedValues)
+      return
+    }
+    void generateCourse(nextVariant, values)
+  }
+
+  const handleValuesChange = (nextValues: PlannerValues) => {
+    setValues(nextValues)
+    setVariant(0)
+    if (plan) setPlan(null)
+  }
+
+  const handleUseLocation = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("이 브라우저에서는 현재 위치를 사용할 수 없어요.")
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setValues((current) => ({
+          ...current,
+          originKey: "current",
+          originLabel: "내 현재 위치",
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }))
+        setPlan(null)
+        setLocating(false)
+        toast.success("현재 위치를 출발지로 설정했어요.")
+      },
+      () => {
+        setLocating(false)
+        toast.error("위치를 사용할 수 없어요.", {
+          description: "동네나 역을 직접 선택해 주세요.",
+        })
+      },
+      { enableHighAccuracy: false, timeout: 8_000, maximumAge: 300_000 },
+    )
+  }
+
+  const handleSave = () => {
+    if (!plan) return
+    const alreadySaved = savedPlans.some((item) => item.id === plan.id)
+    const next = alreadySaved
+      ? savedPlans.filter((item) => item.id !== plan.id)
+      : [
+          ...savedPlans,
+          {
+            id: plan.id,
+            title: plan.title,
+            savedAt: new Date().toISOString(),
+            values,
+            variant,
+            plan,
+          },
+        ]
+    setSavedPlans(next)
+    localStorage.setItem(SAVED_KEY, JSON.stringify(next))
+    toast.success(alreadySaved ? "저장에서 삭제했어요." : "이 코스를 저장했어요.", {
+      description: alreadySaved ? undefined : "출발 위치와 함께 이 브라우저에만 보관됩니다.",
+    })
+  }
+
+  const handleShare = async () => {
+    if (!plan) return
+    const text = `${plan.title} · ${plan.totals.stopCount}곳 · 콘텐츠 비용 ${plan.totals.contentCostWon.toLocaleString("ko-KR")}원`
+    const { url: shareUrl, generalizedLocation } = buildShareUrl(values, variant)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: plan.title, text, url: shareUrl })
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${shareUrl}`)
+        toast.success("공유 문구를 복사했어요.")
+      }
+      if (generalizedLocation) {
+        toast.info("정확한 현재 위치는 공유하지 않았어요.", {
+          description: "가장 가까운 서울 기준점으로 바꿔 개인정보를 보호했어요.",
+        })
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return
+      toast.error("공유하지 못했어요. 잠시 후 다시 시도해 주세요.")
+    }
+  }
+
+  const handleSavedClick = () => {
+    if (savedPlans.length === 0) {
+      toast("아직 저장한 코스가 없어요.", { description: "마음에 드는 코스를 만들고 저장해 보세요." })
+      return
+    }
+    const latest = savedPlans.at(-1)!
+    setValues(latest.values)
+    setVariant(latest.variant)
+    setPlan(latest.plan)
+    toast.success(`저장한 코스 ${savedPlans.length}개 중 최근 코스를 열었어요.`, {
+      description: latest.title,
+    })
+    window.setTimeout(() => {
+      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 80)
+  }
+
+  const scrollToPlanner = () => {
+    setPlan(null)
+    window.setTimeout(() => {
+      document.getElementById("planner")?.scrollIntoView({ behavior: "smooth", block: "start" })
+      document.getElementById("planner-title")?.focus({ preventScroll: true })
+    }, 40)
+  }
+
+  return (
+    <div id="top" className={plan ? "pb-20 lg:pb-0" : undefined}>
+      <AppHeader savedCount={savedPlans.length} onSavedClick={handleSavedClick} />
+
+      <main>
+        <section className="relative isolate overflow-hidden">
+          <div aria-hidden="true" className="ambient-grid absolute inset-x-0 top-0 -z-10 h-[590px]" />
+          <div
+            aria-hidden="true"
+            className="absolute top-[-180px] left-[62%] -z-20 size-[460px] rounded-full bg-accent/18 blur-[100px]"
+          />
+          <div className="mx-auto max-w-[1240px] px-4 pt-14 pb-10 sm:px-6 sm:pt-18 lg:px-8 lg:pt-22 lg:pb-14">
+            <div className="max-w-3xl">
+              <Badge variant="outline" className="mb-5 gap-1.5 bg-background/80 px-3 py-1.5 backdrop-blur-sm">
+                <span className="size-1.5 rounded-full bg-success" />
+                서울에서 바로 떠날 코스
+              </Badge>
+              <h1 className="text-[42px] leading-[1.06] font-extrabold tracking-[-0.065em] text-balance sm:text-[58px] lg:text-[68px]">
+                오늘 얼마로
+                <br />
+                <span className="relative inline-block text-primary">
+                  놀까요?
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 230 18"
+                    className="absolute -right-1 -bottom-2 -z-10 h-4 w-[105%] text-accent"
+                    preserveAspectRatio="none"
+                  >
+                    <path d="M3 12 C54 2 141 4 227 8" fill="none" stroke="currentColor" strokeWidth="11" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </h1>
+              <p className="mt-6 max-w-xl text-[16px] leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+                예산과 시간만 정하면, 지금 갈 수 있는 장소를 연결해 오늘 실행할 코스 하나를 만들어요.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5 text-xs font-semibold text-foreground/75">
+                <HeroPoint icon={Check} label="예산 초과 없이" />
+                <HeroPoint icon={Clock3} label="운영시간에 맞게" />
+                <HeroPoint icon={Footprints} label="도보 동선으로" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="planner" className="scroll-mt-20 pb-16 sm:pb-20">
+          <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold tracking-[0.13em] text-success-foreground">PLAN YOUR DAY</p>
+                <h2
+                  id="planner-title"
+                  tabIndex={-1}
+                  className="mt-1 text-2xl font-bold tracking-[-0.04em] outline-none sm:text-3xl"
+                >
+                  내 조건만 알려주세요
+                </h2>
+              </div>
+              <Badge variant="secondary" className="hidden gap-1.5 sm:flex">
+                <Database className="size-3.5" /> 서울 MVP
+              </Badge>
+            </div>
+
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(350px,.8fr)]">
+              <PlannerForm
+                values={values}
+                onChange={handleValuesChange}
+                onSubmit={() => void generateCourse()}
+                onUseCurrentLocation={handleUseLocation}
+                locating={locating}
+                generating={generating}
+              />
+              <PlannerSummary values={values} onSubmit={() => void generateCourse()} generating={generating} />
+            </div>
+          </div>
+        </section>
+
+        {generating ? <GeneratingCard stage={generationStage} /> : null}
+        {!generating && plan ? (
+          <TripResult
+            key={plan.id}
+            plan={plan}
+            saved={isSaved}
+            onSave={handleSave}
+            onShare={() => void handleShare()}
+            onRegenerate={handleRegenerate}
+            onEdit={scrollToPlanner}
+          />
+        ) : null}
+      </main>
+
+      <footer className="border-t border-border/70 bg-background">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <BrandMark className="opacity-75" />
+          <p className="max-w-xl text-[11px] leading-5 text-muted-foreground sm:text-right">
+            ZERO TRIP은 현재 서울 데모 데이터를 사용합니다. 실제 출발 전 가격·휴관일·예약 여부를 공식 채널에서 확인하세요.
+          </p>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+function HeroPoint({ icon: Icon, label }: { icon: typeof Check; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
+        <Icon className="size-3" />
+      </span>
+      {label}
+    </span>
+  )
+}
+
+export default App
