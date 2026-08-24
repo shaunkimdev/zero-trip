@@ -169,6 +169,15 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
             </div>
           </div>
 
+          {plan.stops.length > 0 ? (
+            <SeoulDotMap
+              plan={plan}
+              activeStopId={activeStopId}
+              onActiveStopChange={setActiveStopId}
+              className="mb-6"
+            />
+          ) : null}
+
           <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <MetricCard
               icon={WalletCards}
@@ -182,7 +191,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
           </div>
 
           {plan.stops.length > 0 ? (
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(340px,.75fr)]">
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
               <Card className="overflow-visible [--card-spacing:--spacing(6)]">
                 <CardHeader>
                   <CardTitle className="text-lg">오늘의 일정</CardTitle>
@@ -209,12 +218,6 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
               </Card>
 
               <div className="min-w-0 space-y-5 lg:sticky lg:top-24">
-                <SeoulDotMap
-                  plan={plan}
-                  activeStopId={activeStopId}
-                  onActiveStopChange={setActiveStopId}
-                />
-
                 <Card size="sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -460,7 +463,7 @@ function EmptyPlan({ onEdit, onRegenerate }: { onEdit: () => void; onRegenerate:
         </span>
         <h3 className="mt-5 text-xl font-bold tracking-[-0.03em]">이 조건으로는 코스를 완성하기 어려워요.</h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          걷기 거리를 조금 늘리거나 피하고 싶은 조건을 줄이면 더 좋은 코스를 찾을 수 있어요.
+          예산이나 이용 시간을 바꾸면 더 좋은 코스를 찾을 수 있어요.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Button type="button" onClick={onRegenerate}>

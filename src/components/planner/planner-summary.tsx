@@ -2,7 +2,6 @@ import {
   CalendarDays,
   Check,
   Clock3,
-  Footprints,
   MapPin,
   ShieldCheck,
   Sparkles,
@@ -102,7 +101,6 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
               <SummaryItem icon={MapPin} text={values.originLabel} />
               <SummaryItem icon={CalendarDays} text={dateLabel(values.date)} />
               <SummaryItem icon={Clock3} text={`${formatTime(values.startMin)}–${endTime}`} />
-              <SummaryItem icon={Footprints} text={`최대 ${values.maxWalkKm}km`} />
             </div>
           </div>
 

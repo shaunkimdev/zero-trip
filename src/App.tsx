@@ -13,7 +13,6 @@ import { planTrip } from "@/lib/planner"
 import {
   DEFAULT_PLANNER_VALUES,
   ORIGINS,
-  type AvoidKey,
   type CompanionKey,
   type PlannerValues,
   type WantKey,
@@ -21,6 +20,7 @@ import {
 import type { TripPlan } from "@/types/trip"
 
 const SAVED_KEY = "zero-trip:saved-plans"
+const DEFAULT_MAX_WALKING_KM = 12
 
 interface SavedPlan {
   id: string
@@ -63,10 +63,10 @@ function createTripPlan(values: PlannerValues, variant: number) {
     startTime: minuteToTime(values.startMin),
     endTime: minuteToTime(values.startMin + values.durationMin),
     budgetWon: values.budget,
-    maxWalkingKm: values.maxWalkKm,
+    maxWalkingKm: DEFAULT_MAX_WALKING_KM,
     companion: values.companion,
     wants: values.wants,
-    avoids: values.avoids,
+    avoids: [],
     partySize: 1,
     variant,
   })
@@ -93,15 +93,6 @@ const wants = new Set<WantKey>([
   "photo",
   "rest",
 ])
-const avoids = new Set<AvoidKey>([
-  "crowds",
-  "waiting",
-  "long-walk",
-  "outdoors",
-  "stairs",
-  "long-distance",
-])
-
 function loadSharedState(): { values: PlannerValues; variant: number; plan: TripPlan } | null {
   try {
     const params = new URLSearchParams(window.location.search)
@@ -116,10 +107,6 @@ function loadSharedState(): { values: PlannerValues; variant: number; plan: Trip
     const sharedWants = (wantsParam ?? "")
       .split(",")
       .filter((value): value is WantKey => wants.has(value as WantKey))
-    const sharedAvoids = (params.get("avoids") ?? "")
-      .split(",")
-      .filter((value): value is AvoidKey => avoids.has(value as AvoidKey))
-
     const values: PlannerValues = {
       ...DEFAULT_PLANNER_VALUES,
       originKey: originKeys.has(params.get("originKey") as PlannerValues["originKey"])
@@ -136,13 +123,11 @@ function loadSharedState(): { values: PlannerValues; variant: number; plan: Trip
         ? numberParam("duration", DEFAULT_PLANNER_VALUES.durationMin)
         : DEFAULT_PLANNER_VALUES.durationMin,
       budget: Math.min(50_000, Math.max(0, numberParam("budget", DEFAULT_PLANNER_VALUES.budget))),
-      maxWalkKm: Math.min(12, Math.max(2, numberParam("walk", DEFAULT_PLANNER_VALUES.maxWalkKm))),
       companion:
         companionParam && companions.has(companionParam)
           ? companionParam
           : DEFAULT_PLANNER_VALUES.companion,
       wants: wantsParam === null ? DEFAULT_PLANNER_VALUES.wants : sharedWants,
-      avoids: sharedAvoids,
     }
     if (values.startMin + values.durationMin > 24 * 60) values.durationMin = 180
     const variant = Math.max(0, Math.trunc(numberParam("variant", 0)))
@@ -182,15 +167,22 @@ function buildShareUrl(values: PlannerValues, variant: number) {
   params.set("start", String(values.startMin))
   params.set("duration", String(values.durationMin))
   params.set("budget", String(values.budget))
-  params.set("walk", String(values.maxWalkKm))
   params.set("companion", values.companion)
   params.set("wants", values.wants.join(","))
-  params.set("avoids", values.avoids.join(","))
   params.set("variant", String(variant))
   return { url: url.toString(), generalizedLocation: Boolean(nearestPublicOrigin) }
 }
 
 const sharedInitialState = loadSharedState()
+
+function scrollToGeneratedCourse() {
+  const map = document.getElementById("course-map")
+  const target = map ?? document.getElementById("result")
+  target?.scrollIntoView({
+    behavior: "smooth",
+    block: map ? "center" : "start",
+  })
+}
 
 function App() {
   const [values, setValues] = useState<PlannerValues>(
@@ -210,9 +202,7 @@ function App() {
 
   useEffect(() => {
     if (!sharedInitialState) return
-    const timer = window.setTimeout(() => {
-      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, 350)
+    const timer = window.setTimeout(scrollToGeneratedCourse, 350)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -238,7 +228,7 @@ function App() {
         setPlan(nextPlan)
         setGenerating(false)
         window.setTimeout(() => {
-          document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          scrollToGeneratedCourse()
           document.getElementById("result-title")?.focus({ preventScroll: true })
         }, 80)
       } catch (error) {
@@ -255,21 +245,6 @@ function App() {
   const handleRegenerate = () => {
     const nextVariant = variant + 1
     setVariant(nextVariant)
-    if (plan?.stops.length === 0) {
-      const relaxedValues: PlannerValues = {
-        ...values,
-        maxWalkKm: Math.min(12, values.maxWalkKm + 2),
-        avoids: values.avoids.filter(
-          (avoid) => !["long-walk", "long-distance", "outdoors"].includes(avoid),
-        ),
-      }
-      setValues(relaxedValues)
-      toast("조건을 조금 넓혀 다시 찾을게요.", {
-        description: `최대 도보 ${relaxedValues.maxWalkKm}km · 인접 야외 장소 허용`,
-      })
-      void generateCourse(nextVariant, relaxedValues)
-      return
-    }
     void generateCourse(nextVariant, values)
   }
 
@@ -366,9 +341,7 @@ function App() {
     toast.success(`저장한 코스 ${savedPlans.length}개 중 최근 코스를 열었어요.`, {
       description: latest.title,
     })
-    window.setTimeout(() => {
-      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, 80)
+    window.setTimeout(scrollToGeneratedCourse, 80)
   }
 
   const scrollToPlanner = () => {

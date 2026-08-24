@@ -28,7 +28,6 @@ import {
   getNextPlanningStart,
   localDateString,
   ORIGINS,
-  type AvoidKey,
   type CompanionKey,
   type PlannerValues,
   type WantKey,
@@ -62,15 +61,6 @@ const wantOptions = [
   { value: "culture" as const, label: "문화", icon: Landmark },
   { value: "cafe" as const, label: "카페", icon: Coffee },
   { value: "rest" as const, label: "휴식", icon: Umbrella },
-]
-
-const avoidOptions = [
-  { value: "crowds" as const, label: "사람 많은 곳" },
-  { value: "waiting" as const, label: "긴 대기" },
-  { value: "long-walk" as const, label: "많이 걷기" },
-  { value: "outdoors" as const, label: "야외" },
-  { value: "stairs" as const, label: "계단" },
-  { value: "long-distance" as const, label: "장거리 이동" },
 ]
 
 const startTimes = Array.from({ length: 25 }, (_, index) => {
@@ -134,11 +124,6 @@ export function PlannerForm({
   const toggleWant = (value: WantKey) => {
     const selected = values.wants.includes(value)
     set("wants", selected ? values.wants.filter((item) => item !== value) : [...values.wants, value])
-  }
-
-  const toggleAvoid = (value: AvoidKey) => {
-    const selected = values.avoids.includes(value)
-    set("avoids", selected ? values.avoids.filter((item) => item !== value) : [...values.avoids, value])
   }
 
   return (
@@ -368,51 +353,6 @@ export function PlannerForm({
               onClick={() => toggleWant(option.value)}
             />
           ))}
-        </div>
-      </fieldset>
-
-      <Divider />
-
-      <fieldset>
-        <legend className="sr-only">피하고 싶은 조건</legend>
-        <SectionTitle step="06" title="피하고 싶은 것" description="선택한 조건의 장소와 이동은 코스에서 제외해요." />
-        <div className="flex flex-wrap gap-2">
-          {avoidOptions.map((option) => (
-            <ChoiceChip
-              key={option.value}
-              label={option.label}
-              selected={values.avoids.includes(option.value)}
-              onClick={() => toggleAvoid(option.value)}
-            />
-          ))}
-        </div>
-      </fieldset>
-
-      <Divider />
-
-      <fieldset>
-        <legend className="sr-only">최대 걷기 거리</legend>
-        <SectionTitle
-          step="07"
-          title="최대 걷기 거리"
-          description="출발지와 장소 사이 이동 거리를 모두 합친 기준이에요."
-        />
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">천천히 둘러볼게요</span>
-          <output className="tabular-nums text-lg font-bold">최대 {values.maxWalkKm}km</output>
-        </div>
-        <Slider
-          value={[values.maxWalkKm]}
-          min={2}
-          max={12}
-          step={1}
-          onValueChange={([value]) => set("maxWalkKm", value)}
-          aria-label="최대 걷기 거리"
-          aria-valuetext={`${values.maxWalkKm}킬로미터`}
-        />
-        <div className="mt-3 flex justify-between text-[10px] font-medium text-muted-foreground">
-          <span>2km</span>
-          <span>12km</span>
         </div>
       </fieldset>
 

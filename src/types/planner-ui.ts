@@ -11,14 +11,6 @@ export type WantKey =
   | "culture"
   | "photo"
   | "rest"
-export type AvoidKey =
-  | "crowds"
-  | "waiting"
-  | "long-walk"
-  | "outdoors"
-  | "stairs"
-  | "long-distance"
-
 export interface PlannerValues {
   originKey: OriginKey
   originLabel: string
@@ -28,10 +20,8 @@ export interface PlannerValues {
   startMin: number
   durationMin: number
   budget: number
-  maxWalkKm: number
   companion: CompanionKey
   wants: WantKey[]
-  avoids: AvoidKey[]
 }
 
 export interface OriginOption {
@@ -102,8 +92,6 @@ export const DEFAULT_PLANNER_VALUES: PlannerValues = {
   startMin: initialSchedule.startMin,
   durationMin: 360,
   budget: 0,
-  maxWalkKm: 8,
   companion: "couple",
   wants: ["free", "exhibition", "walk", "night-view"],
-  avoids: ["crowds"],
 }

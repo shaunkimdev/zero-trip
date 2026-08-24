@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 const stages = [
   { icon: Search, label: "조건에 맞는 장소를 찾고 있어요" },
   { icon: WalletCards, label: "운영시간과 가격을 확인하고 있어요" },
-  { icon: Route, label: "걷기 거리 안에서 순서를 맞추고 있어요" },
+  { icon: Route, label: "장소 사이 동선과 순서를 맞추고 있어요" },
 ]
 
 export function GeneratingCard({ stage }: { stage: number }) {
