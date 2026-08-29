@@ -48,6 +48,27 @@ SEOUL_BUS_SERVICE_KEY=
 
 공공데이터포털에서 여러 API에 같은 프로젝트 서비스키를 승인받은 경우 값이 같아도 됩니다. 환경 변수는 API별 권한·교체·오류 확인을 쉽게 하려고 따로 두었습니다.
 
+## RAGFlow·Airbyte 서버 설정
+
+RAGFlow와 Airbyte 값은 선택 사항입니다. 비어 있으면 로컬 데모 모드로 실행됩니다. RAGFlow의 URL·API key·dataset ID·허용 출처 host 일부만 입력한 경우에는 정확하지 않은 fallback을 막기 위해 `misconfigured` 상태로 처리합니다.
+
+```dotenv
+RAGFLOW_BASE_URL=https://ragflow.example.com
+RAGFLOW_API_KEY=서버_API_키
+RAGFLOW_DATASET_IDS=서울_관광_dataset_id
+RAGFLOW_ALLOWED_SOURCE_HOSTS=data.seoul.go.kr
+
+AIRBYTE_API_URL=https://api.airbyte.com/v1
+AIRBYTE_CLIENT_ID=application_client_id
+AIRBYTE_CLIENT_SECRET=application_client_secret
+AIRBYTE_MAIN_DB_CONNECTION_IDS=메인_DB_connection_uuid
+AIRBYTE_RAGFLOW_CONNECTION_IDS=RAG_파이프라인_connection_uuid
+
+ZERO_TRIP_TOOLS_ADMIN_TOKEN=충분히_긴_관리자_토큰
+```
+
+Airbyte는 고정 `AIRBYTE_ACCESS_TOKEN`도 지원하지만, 만료 시간이 포함된 client credentials 방식을 권장합니다. 실제 주기 실행은 앱 타이머가 아니라 각 Airbyte Connection의 schedule에서 설정합니다. 전체 변수, canonical 장소 JSON 형식, 관리자 API와 무중단 RAG 인덱스 교체 절차는 [`docs/TOOL_INTEGRATIONS.md`](./docs/TOOL_INTEGRATIONS.md)를 참고하세요.
+
 ## 별도 키가 필요 없는 것
 
 - 현재 픽셀형 서울 지도와 한강 표현은 로컬 데이터라 지도 키가 필요 없습니다.
@@ -73,3 +94,4 @@ npm run dev
 - 서버 전용 키에는 `VITE_` 접두사를 붙이지 않습니다. `VITE_` 변수는 브라우저 번들에 포함될 수 있습니다.
 - 키를 React 코드, 공유 URL, 커밋, 스크린샷에 넣지 않습니다.
 - 카카오 REST 키는 가능하면 호출 허용 IP를 설정하고 서버 프록시를 통해 사용합니다.
+- RAGFlow·Airbyte·관리자 토큰도 서버 전용이며 `VITE_` 접두사를 붙이지 않습니다.

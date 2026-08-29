@@ -5,7 +5,7 @@ import type {
   PlacePrice,
   Weekday,
   WeeklyOpeningHours,
-} from "../types/trip"
+} from "../types/trip.ts"
 
 const DAYS: readonly Weekday[] = [
   "sun",
@@ -60,9 +60,12 @@ const GALLERY_HOURS = weeklyHours("10:00", "18:00", ["mon"], 30)
 
 const free = (note = "상설 관람 무료"): PlacePrice => ({
   kind: "free",
+  basis: "admission",
   adultWon: 0,
   youthWon: 0,
   childWon: 0,
+  minimumWon: 0,
+  maximumWon: 0,
   note,
 })
 
@@ -73,17 +76,38 @@ const paid = (
   note?: string,
 ): PlacePrice => ({
   kind: "paid",
+  basis: "admission",
   adultWon,
   youthWon,
   childWon,
+  minimumWon: null,
+  maximumWon: null,
+  note,
+})
+
+const perPerson = (
+  minimumWon: number,
+  maximumWon: number,
+  note?: string,
+): PlacePrice => ({
+  kind: "paid",
+  basis: "per-person",
+  adultWon: null,
+  youthWon: null,
+  childWon: null,
+  minimumWon,
+  maximumWon,
   note,
 })
 
 const unknown = (note: string): PlacePrice => ({
   kind: "unknown",
+  basis: "admission",
   adultWon: null,
   youthWon: null,
   childWon: null,
+  minimumWon: null,
+  maximumWon: null,
   note,
 })
 
@@ -316,7 +340,7 @@ export const seoulPlaces = [
     address: "서울 종로구 안국동 일대",
     summary: "전시와 산책 사이 잠시 쉬어 가는 로컬 카페 선택지",
     recommendedVisitMinutes: 45,
-    price: paid(5_500, 5_500, 5_500, "아메리카노 1잔 기준 데모 평균가"),
+    price: perPerson(4_500, 5_500, "음료 1잔 기준 데모 가격대"),
     openingHours: weeklyHours("09:00", "21:00"),
     tags: ["cafe", "rest", "photo", "indoor"],
     companions: PEOPLE,
@@ -499,7 +523,7 @@ export const seoulPlaces = [
     address: "서울 성동구 서울숲길 일대",
     summary: "서울숲 동선 중 음료와 Wi-Fi를 이용하는 실내 휴식",
     recommendedVisitMinutes: 50,
-    price: paid(6_500, 6_500, 6_500, "음료 1잔 기준 데모 평균가"),
+    price: perPerson(5_000, 6_500, "음료 1잔 기준 데모 가격대"),
     openingHours: weeklyHours("09:00", "21:00"),
     tags: ["cafe", "rest", "photo", "indoor"],
     companions: PEOPLE,
@@ -702,7 +726,7 @@ export const seoulPlaces = [
     address: "서울 마포구 망원동 일대",
     summary: "한강과 동네 산책 사이 가볍게 쉬는 예산형 카페",
     recommendedVisitMinutes: 45,
-    price: paid(5_000, 5_000, 5_000, "음료 1잔 기준 데모 평균가"),
+    price: perPerson(4_000, 5_000, "음료 1잔 기준 데모 가격대"),
     openingHours: weeklyHours("09:00", "21:00"),
     tags: ["cafe", "rest", "indoor"],
     companions: EVERYONE,

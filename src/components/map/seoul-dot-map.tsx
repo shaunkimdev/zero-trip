@@ -138,7 +138,7 @@ const placeDistrictIndex = new Map(
 
 const freeContentByDistrict = new Map<number, number>()
 for (const place of placeCatalog) {
-  if (place.price.kind !== "free" && place.price.adultWon !== 0) continue
+  if (place.price.kind !== "free") continue
   const districtIndex = placeDistrictIndex.get(place.id) ?? -1
   if (districtIndex < 0) continue
   freeContentByDistrict.set(
@@ -279,21 +279,31 @@ export function SeoulDotMap({
       .map((stop) => districtForPoint(stop.place.location).index)
       .filter((index) => index >= 0),
   )
+  const routeFreeContentByDistrict = new Map<number, number>()
+  for (const stop of plan.stops) {
+    if (stop.place.price.kind !== "free") continue
+    const districtIndex = districtForPoint(stop.place.location).index
+    if (districtIndex < 0) continue
+    routeFreeContentByDistrict.set(
+      districtIndex,
+      (routeFreeContentByDistrict.get(districtIndex) ?? 0) + 1,
+    )
+  }
+  const routeFreeDistricts = new Set(routeFreeContentByDistrict.keys())
   const activeMarker =
     markers.find(({ stop }) => stop.place.id === activeStopId) ?? markers[0]
   const activeDistrict = activeMarker
     ? seoulGuBoundaries.features[activeMarker.dot.featureIndex]?.properties
     : undefined
   const activeFreeCount = activeMarker
-    ? freeContentByDistrict.get(activeMarker.dot.featureIndex) ?? 0
+    ? routeFreeContentByDistrict.get(activeMarker.dot.featureIndex) ?? 0
     : 0
   const todayEventCount = activeMarker
-    ? placeCatalog.filter((place) => {
-        if (placeDistrictIndex.get(place.id) !== activeMarker.dot.featureIndex) return false
-        if (!place.event) return false
-        const target = isoDate(plan.request.date)
-        return target >= place.event.startDate && target <= place.event.endDate
-      }).length
+    ? plan.stops.filter(
+        (stop) =>
+          districtForPoint(stop.place.location).index === activeMarker.dot.featureIndex &&
+          eventIsOnDate(stop, plan.request.date),
+      ).length
     : 0
   const routeDots = dottedPolyline(
     markers.map(({ dot }) => ({ x: dot.x, y: dot.y })),
@@ -371,7 +381,7 @@ export function SeoulDotMap({
           <g aria-hidden="true">
             {seoulDots.map((dot) => {
               const onRoute = routeDistricts.has(dot.featureIndex)
-              const hasFreeContent = freeDistricts.has(dot.featureIndex)
+              const hasFreeContent = routeFreeDistricts.has(dot.featureIndex)
               return (
                 <circle
                   key={dot.id}
@@ -711,8 +721,8 @@ export function SeoulDotMap({
             </p>
           </div>
           <div className="shrink-0 text-right text-[10px] leading-5 text-muted-foreground">
-            <p>무료 장소 {activeFreeCount}곳</p>
-            <p>오늘 행사 {todayEventCount}개</p>
+            <p>코스 내 무료 {activeFreeCount}곳</p>
+            <p>코스 내 오늘 행사 {todayEventCount}개</p>
           </div>
         </div>
 
@@ -751,7 +761,7 @@ export function SeoulDotMap({
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[10px] text-muted-foreground" aria-label="지도 범례">
           <LegendDot color="oklch(0.86 0.012 95)" label="기본 지역" />
-          <LegendDot color="oklch(0.76 0.035 145)" label="무료 콘텐츠" />
+          <LegendDot color="oklch(0.76 0.035 145)" label="코스 내 무료" />
           <LegendDot color="oklch(0.68 0.105 226)" label="한강" />
           <LegendDot color="#2563eb" label="여유 · 낮음" />
           <LegendDot color="#7377dc" label="보통" />

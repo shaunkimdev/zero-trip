@@ -1,6 +1,6 @@
 import seoulBoundaryRaw from "./seoul-gu.geojson?raw"
 
-import type { GeoFeatureCollection } from "@/lib/geo"
+import type { GeoFeatureCollection } from "../lib/geo.ts"
 
 export interface SeoulGuProperties {
   code: string

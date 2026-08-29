@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv } from "vite"
 
 import { seoulPopulationApi } from "./server/seoul-population-api.ts"
+import { zeroTripToolsApi } from "./server/tools/api.ts"
 
 const [repositoryOwner, repositoryName] = (process.env.GITHUB_REPOSITORY ?? "").split("/")
 const pagesBase =
@@ -21,6 +22,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      zeroTripToolsApi(env),
       seoulPopulationApi(env.SEOUL_OPEN_DATA_KEY ?? process.env.SEOUL_OPEN_DATA_KEY),
     ],
     resolve: {

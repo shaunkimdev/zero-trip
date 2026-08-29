@@ -22,6 +22,7 @@ import {
   Sparkles,
   Trees,
   Umbrella,
+  UtensilsCrossed,
   WalletCards,
   Wifi,
   type LucideIcon,
@@ -69,6 +70,7 @@ const categoryIcons: Record<PlaceCategory, LucideIcon> = {
   "night-view": MoonStar,
   rest: Armchair,
   cafe: Coffee,
+  restaurant: UtensilsCrossed,
   landmark: MapPinned,
 }
 
@@ -123,6 +125,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
   const budget = plan.request.budgetWon
   const usedPercent = budget > 0 ? Math.min(100, (plan.totals.contentCostWon / budget) * 100) : 0
   const wifiStopCount = plan.stops.filter((stop) => stop.place.amenities.wifi.available).length
+  const isGrounded = plan.grounding?.mode === "ragflow"
 
   return (
     <section id="result" className="scroll-mt-20 border-t border-border/70 bg-card/45 py-14 sm:py-18">
@@ -140,7 +143,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
               </button>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="success" className="gap-1.5">
-                  <Check className="size-3" /> 데모 운영시간 반영
+                  <Check className="size-3" /> {isGrounded ? "RAGFlow 출처 정책 통과" : "데모 운영시간 반영"}
                 </Badge>
                 <Badge variant="outline">서울 · 도보 중심</Badge>
               </div>
@@ -181,7 +184,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
           <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <MetricCard
               icon={WalletCards}
-              label="콘텐츠 비용"
+              label="일정 비용"
               value={`₩${plan.totals.contentCostWon.toLocaleString("ko-KR")}`}
               accent
             />
@@ -222,15 +225,16 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <WalletCards className="size-4 text-primary" />
-                      예상 콘텐츠 비용
+                      예상 일정 비용
                     </CardTitle>
-                    <CardDescription>1인 기준 · 식사와 교통비 제외</CardDescription>
+                    <CardDescription>1인 기준 · 선택된 식사 포함 · 교통비 제외</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <CostRow label="입장·관람" value={plan.costs.admissionWon} />
                     <CostRow label="전시" value={plan.costs.exhibitionWon} />
                     <CostRow label="공연·행사" value={plan.costs.performanceWon} />
                     <CostRow label="카페" value={plan.costs.cafeWon} />
+                    <CostRow label="식사" value={plan.costs.mealWon} />
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <Wifi className="size-3.5" /> 경로 내 Wi-Fi
@@ -242,7 +246,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
                     <Separator className="my-4" />
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-xs text-muted-foreground">콘텐츠 비용 합계</p>
+                        <p className="text-xs text-muted-foreground">일정 비용 합계</p>
                         <p className="tabular-nums mt-1 text-2xl font-extrabold tracking-[-0.04em]">
                           ₩{plan.costs.totalWon.toLocaleString("ko-KR")}
                         </p>
@@ -262,7 +266,7 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
                     ) : null}
                     <div className="mt-4 flex gap-2 rounded-xl bg-muted/70 p-3 text-[11px] leading-5 text-muted-foreground">
                       <Info className="mt-0.5 size-3.5 shrink-0" />
-                      선택한 카페 음료는 포함하고, 별도 식사와 교통비는 포함하지 않아요.
+                      선택된 카페·식당은 출처가 확인된 가격대 상한으로 계산하며 교통비는 포함하지 않아요.
                     </div>
                   </CardContent>
                 </Card>
@@ -290,7 +294,11 @@ export function TripResult({ plan, saved, onSave, onShare, onRegenerate, onEdit 
           ) : null}
 
           <div className="mt-6 flex flex-col gap-2 text-[11px] leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>데모 데이터 · 실제 출발 전 공식 운영정보와 예약 여부를 다시 확인해 주세요.</span>
+            <span>
+              {isGrounded
+                ? `RAGFlow 검색 ${plan.grounding?.retrievedChunkCount ?? 0}건 · 정책 통과 후보 ${plan.grounding?.acceptedPlaceCount ?? 0}곳 중 ${plan.stops.length}곳 사용`
+                : "데모 데이터 · 실제 출발 전 공식 운영정보와 예약 여부를 다시 확인해 주세요."}
+            </span>
             <span className="inline-flex items-center gap-1.5">
               <Sparkles className="size-3" /> 조건 기반 경로 최적화 결과
             </span>
@@ -413,7 +421,9 @@ function TimelineStop({
           <Badge variant={stop.costWon === 0 ? "lime" : "outline"}>
             {stop.costWon === 0 ? "무료" : formatWon(stop.costWon)}
           </Badge>
-          <Badge variant="success">데모 운영시간 기준</Badge>
+          <Badge variant="success">
+            {stop.place.source.name.includes("데모") ? "데모 운영시간 기준" : "출처 정책 통과"}
+          </Badge>
           {stop.waitMinutes > 0 ? (
             <Badge variant="outline">일정 대기 {stop.waitMinutes}분</Badge>
           ) : null}
@@ -440,6 +450,22 @@ function TimelineStop({
             <span>{stop.reasons.slice(0, 2).join(" · ")}</span>
           </div>
         ) : null}
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 text-[10px] leading-4 text-muted-foreground">
+          <span>
+            출처 · {stop.place.source.name} · {stop.place.source.updatedAt.slice(0, 10)} 기준
+          </span>
+          {stop.place.source.url ? (
+            <a
+              href={stop.place.source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 underline decoration-border underline-offset-2 hover:text-foreground"
+            >
+              원문 확인 <ExternalLink className="size-2.5" />
+            </a>
+          ) : null}
+        </div>
       </div>
     </li>
   )

@@ -1,4 +1,4 @@
-import { seoulPlaces } from "../data/seoul-places"
+import { seoulPlaces } from "../data/seoul-places.ts"
 import {
   COMPANION_LABELS,
   INTEREST_LABELS,
@@ -11,7 +11,7 @@ import {
   type TripPlan,
   type TripRequest,
   type Weekday,
-} from "../types/trip"
+} from "../types/trip.ts"
 
 const SEOUL_TIME_ZONE = "Asia/Seoul"
 const WALKING_METERS_PER_MINUTE = 75
@@ -33,6 +33,7 @@ const INTEREST_CATEGORIES: Record<Exclude<Interest, "free">, readonly PlaceCateg
   "night-view": ["night-view"],
   walk: ["walk", "park", "night-view"],
   cafe: ["cafe"],
+  food: ["restaurant"],
   performance: ["performance", "event"],
   park: ["park"],
   culture: ["museum", "exhibition", "event", "performance", "landmark"],
@@ -280,7 +281,15 @@ export function planTrip(
     request.maxWalkingKm,
     request.companion,
     normalized.variant,
-    ...best.stops.map((stop) => stop.place.id),
+    ...best.stops.map((stop) =>
+      [
+        stop.place.id,
+        stop.place.source.updatedAt,
+        stop.costWon,
+        stop.startMinute,
+        stop.departMinute,
+      ].join("@"),
+    ),
   ].join("|")
 
   return {
@@ -412,6 +421,11 @@ function priceForParty(
 ): number | null {
   if (place.price.kind === "unknown") return null
   if (place.price.kind === "free") return 0
+
+  if (place.price.basis === "per-person") {
+    const conservativePrice = place.price.maximumWon
+    return conservativePrice === null ? null : conservativePrice * partySize
+  }
 
   const adultPrice = place.price.adultWon
   if (adultPrice === null) return null
@@ -623,6 +637,7 @@ function buildCostBreakdown(stops: readonly PlannedStop[]): TripCostBreakdown {
     exhibitionWon: 0,
     performanceWon: 0,
     cafeWon: 0,
+    mealWon: 0,
     wifiWon: 0,
     totalWon: 0,
   }
@@ -632,6 +647,8 @@ function buildCostBreakdown(stops: readonly PlannedStop[]): TripCostBreakdown {
       costs.exhibitionWon += stop.costWon
     } else if (stop.place.category === "cafe") {
       costs.cafeWon += stop.costWon
+    } else if (stop.place.category === "restaurant") {
+      costs.mealWon += stop.costWon
     } else if (
       stop.place.category === "performance" ||
       stop.place.category === "event"
@@ -652,7 +669,7 @@ function buildWarnings(
   state: SearchState,
 ): readonly string[] {
   const warnings: string[] = [
-    `예상 비용은 ${normalized.partySize}인 기준이며 선택한 카페 음료 외 식사와 교통비는 포함하지 않아요.`,
+    `예상 비용은 ${normalized.partySize}인 기준이며 선택한 카페·식당의 검증된 가격대 상한을 포함하지만 교통비는 포함하지 않아요.`,
     "도보 거리와 시간은 직선거리를 보정한 추정치예요.",
   ]
 

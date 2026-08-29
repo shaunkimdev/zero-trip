@@ -14,6 +14,7 @@ import {
   Sparkles,
   Trees,
   Umbrella,
+  UtensilsCrossed,
   UserRound,
   Users,
   Wifi,
@@ -60,6 +61,7 @@ const wantOptions = [
   { value: "photo" as const, label: "사진", icon: Camera },
   { value: "culture" as const, label: "문화", icon: Landmark },
   { value: "cafe" as const, label: "카페", icon: Coffee },
+  { value: "food" as const, label: "식사", icon: UtensilsCrossed },
   { value: "rest" as const, label: "휴식", icon: Umbrella },
 ]
 
@@ -199,7 +201,7 @@ export function PlannerForm({
         <SectionTitle
           step="02"
           title="쓸 수 있는 예산"
-          description="관광·전시·공연과 선택한 카페 음료까지 함께 계산해요."
+          description="관광·전시·공연과 선택한 카페·식당 가격대 상한까지 계산해요."
         />
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>

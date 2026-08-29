@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, Clock3, Database, Footprints, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
@@ -10,6 +10,7 @@ import { PlannerSummary } from "@/components/planner/planner-summary"
 import { Badge } from "@/components/ui/badge"
 import { TripResult } from "@/components/trip/trip-result"
 import { planTrip } from "@/lib/planner"
+import { isTripPlan, requestTripPlan } from "@/lib/trip-api"
 import {
   DEFAULT_PLANNER_VALUES,
   ORIGINS,
@@ -40,7 +41,7 @@ function loadSavedPlans(): SavedPlan[] {
         typeof item.id === "string" &&
         typeof item.title === "string" &&
         Boolean(item.values) &&
-        Boolean(item.plan),
+        isTripPlan(item.plan),
     )
   } catch {
     return []
@@ -56,8 +57,8 @@ function minuteToTime(value: number) {
   return `${String(Math.floor(safeValue / 60)).padStart(2, "0")}:${String(safeValue % 60).padStart(2, "0")}`
 }
 
-function createTripPlan(values: PlannerValues, variant: number) {
-  return planTrip({
+function createTripRequest(values: PlannerValues, variant: number) {
+  return {
     origin: { lat: values.lat, lng: values.lng, label: values.originLabel },
     date: values.date,
     startTime: minuteToTime(values.startMin),
@@ -69,7 +70,22 @@ function createTripPlan(values: PlannerValues, variant: number) {
     avoids: [],
     partySize: 1,
     variant,
-  })
+  } as const
+}
+
+function createDemoTripPlan(values: PlannerValues, variant: number) {
+  const plan = planTrip(createTripRequest(values, variant))
+  return {
+    ...plan,
+    grounding: {
+      mode: "demo",
+      provider: "ZERO TRIP 서울 데모 카탈로그",
+      retrievedAt: new Date().toISOString(),
+      retrievedChunkCount: 0,
+      acceptedPlaceCount: 0,
+      rejectedChunkCount: 0,
+    },
+  } satisfies TripPlan
 }
 
 const companions = new Set<CompanionKey>(["solo", "couple", "children", "parents", "pet"])
@@ -87,13 +103,14 @@ const wants = new Set<WantKey>([
   "night-view",
   "walk",
   "cafe",
+  "food",
   "performance",
   "park",
   "culture",
   "photo",
   "rest",
 ])
-function loadSharedState(): { values: PlannerValues; variant: number; plan: TripPlan } | null {
+function loadSharedState(): { values: PlannerValues; variant: number } | null {
   try {
     const params = new URLSearchParams(window.location.search)
     if (params.get("trip") !== "1") return null
@@ -131,7 +148,7 @@ function loadSharedState(): { values: PlannerValues; variant: number; plan: Trip
     }
     if (values.startMin + values.durationMin > 24 * 60) values.durationMin = 180
     const variant = Math.max(0, Math.trunc(numberParam("variant", 0)))
-    return { values, variant, plan: createTripPlan(values, variant) }
+    return { values, variant }
   } catch {
     return null
   }
@@ -188,23 +205,18 @@ function App() {
   const [values, setValues] = useState<PlannerValues>(
     sharedInitialState?.values ?? DEFAULT_PLANNER_VALUES,
   )
-  const [plan, setPlan] = useState<TripPlan | null>(sharedInitialState?.plan ?? null)
+  const [plan, setPlan] = useState<TripPlan | null>(null)
   const [variant, setVariant] = useState(sharedInitialState?.variant ?? 0)
   const [generating, setGenerating] = useState(false)
   const [generationStage, setGenerationStage] = useState(0)
   const [locating, setLocating] = useState(false)
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(loadSavedPlans)
+  const sharedPlanRequested = useRef(false)
 
   const isSaved = useMemo(
     () => Boolean(plan && savedPlans.some((savedPlan) => savedPlan.id === plan.id)),
     [plan, savedPlans],
   )
-
-  useEffect(() => {
-    if (!sharedInitialState) return
-    const timer = window.setTimeout(scrollToGeneratedCourse, 350)
-    return () => window.clearTimeout(timer)
-  }, [])
 
   const generateCourse = useCallback(
     async (nextVariant = variant, requestValues = values) => {
@@ -223,7 +235,9 @@ function App() {
         setGenerationStage(2)
         await wait(420)
 
-        const nextPlan = createTripPlan(requestValues, nextVariant)
+        const request = createTripRequest(requestValues, nextVariant)
+        const nextPlan =
+          (await requestTripPlan(request)) ?? createDemoTripPlan(requestValues, nextVariant)
 
         setPlan(nextPlan)
         setGenerating(false)
@@ -241,6 +255,12 @@ function App() {
     },
     [generating, values, variant],
   )
+
+  useEffect(() => {
+    if (!sharedInitialState || sharedPlanRequested.current) return
+    sharedPlanRequested.current = true
+    void generateCourse(sharedInitialState.variant, sharedInitialState.values)
+  }, [generateCourse])
 
   const handleRegenerate = () => {
     const nextVariant = variant + 1
@@ -309,7 +329,7 @@ function App() {
 
   const handleShare = async () => {
     if (!plan) return
-    const text = `${plan.title} · ${plan.totals.stopCount}곳 · 콘텐츠 비용 ${plan.totals.contentCostWon.toLocaleString("ko-KR")}원`
+    const text = `${plan.title} · ${plan.totals.stopCount}곳 · 일정 비용 ${plan.totals.contentCostWon.toLocaleString("ko-KR")}원`
     const { url: shareUrl, generalizedLocation } = buildShareUrl(values, variant)
     try {
       if (navigator.share) {
@@ -337,6 +357,14 @@ function App() {
     const latest = savedPlans.at(-1)!
     setValues(latest.values)
     setVariant(latest.variant)
+    if (latest.plan.grounding?.mode === "ragflow") {
+      setPlan(null)
+      toast("저장한 조건을 최신 근거로 다시 확인하고 있어요.", {
+        description: latest.title,
+      })
+      void generateCourse(latest.variant, latest.values)
+      return
+    }
     setPlan(latest.plan)
     toast.success(`저장한 코스 ${savedPlans.length}개 중 최근 코스를 열었어요.`, {
       description: latest.title,
@@ -446,7 +474,9 @@ function App() {
         <div className="mx-auto flex max-w-[1240px] flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <BrandMark className="opacity-75" />
           <p className="max-w-xl text-[11px] leading-5 text-muted-foreground sm:text-right">
-            ZERO TRIP은 현재 서울 데모 데이터를 사용합니다. 실제 출발 전 가격·휴관일·예약 여부를 공식 채널에서 확인하세요.
+            {plan?.grounding?.mode === "ragflow"
+              ? "ZERO TRIP은 RAGFlow 검색 결과를 예산·운영시간·도보 제약으로 다시 검증합니다."
+              : "ZERO TRIP은 현재 서울 데모 데이터를 사용합니다. 실제 출발 전 가격·휴관일·예약 여부를 공식 채널에서 확인하세요."}
           </p>
         </div>
       </footer>

@@ -40,6 +40,7 @@ const wantsLabels: Record<string, string> = {
   photo: "사진",
   culture: "문화",
   cafe: "카페",
+  food: "식사",
   rest: "휴식",
 }
 
@@ -130,7 +131,7 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
             <div className="flex gap-2.5 text-sm leading-6">
               <Check className="mt-1 size-4 shrink-0 text-accent" />
               <p>
-                콘텐츠 비용 <strong>{budgetText} 이하</strong>만 담아요.
+                검증된 일정 비용 <strong>{budgetText} 이하</strong>만 담아요.
               </p>
             </div>
           </div>
@@ -159,7 +160,7 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
       <Card size="sm" className="[--card-spacing:--spacing(4)]">
         <CardContent className="grid grid-cols-3 gap-2 text-center">
           <TrustItem icon={ShieldCheck} title="가격 필터" caption="미확인 제외" />
-          <TrustItem icon={Clock3} title="시간 필터" caption="데모 기준" />
+          <TrustItem icon={Clock3} title="시간 필터" caption="검증 데이터 기준" />
           <TrustItem icon={Wifi} title="무료 Wi-Fi" caption="동선에 표시" />
         </CardContent>
       </Card>

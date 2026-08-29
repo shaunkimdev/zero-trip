@@ -14,6 +14,7 @@ export const INTERESTS = [
   "night-view",
   "walk",
   "cafe",
+  "food",
   "performance",
   "park",
   "culture",
@@ -44,14 +45,46 @@ export const PLACE_CATEGORIES = [
   "night-view",
   "rest",
   "cafe",
+  "restaurant",
   "landmark",
 ] as const
 
 export type PlaceCategory = (typeof PLACE_CATEGORIES)[number]
 
-export type PlaceCluster = "jongno" | "seongsu" | "yeouido-mapo"
+export const PLACE_CLUSTERS = [
+  "jongno",
+  "seongsu",
+  "yeouido-mapo",
+  "gangnam",
+  "gangdong",
+  "gangbuk",
+  "gangseo",
+  "gwanak",
+  "gwangjin",
+  "guro",
+  "geumcheon",
+  "nowon",
+  "dobong",
+  "dongdaemun",
+  "dongjak",
+  "eunpyeong",
+  "jung",
+  "jungnang",
+  "mapo",
+  "seodaemun",
+  "seocho",
+  "seongbuk",
+  "seongdong",
+  "songpa",
+  "yangcheon",
+  "yeongdeungpo",
+  "yongsan",
+] as const
+
+export type PlaceCluster = (typeof PLACE_CLUSTERS)[number]
 
 export type PriceKind = "free" | "paid" | "unknown"
+export type PriceBasis = "admission" | "per-person"
 export type CrowdLevel = "low" | "medium" | "high"
 
 export type Weekday =
@@ -79,9 +112,13 @@ export type WeeklyOpeningHours = Record<Weekday, readonly TimeWindow[]>
 
 export interface PlacePrice {
   kind: PriceKind
+  /** Admission uses age-specific fields; per-person uses the conservative range below. */
+  basis: PriceBasis
   adultWon: number | null
   youthWon: number | null
   childWon: number | null
+  minimumWon: number | null
+  maximumWon: number | null
   note?: string
 }
 
@@ -155,7 +192,7 @@ export interface TripRequest {
   date: string | Date
   startTime: string
   endTime: string
-  /** Per-person activity budget. Selected cafe drinks count; meals and transport do not. */
+  /** Budget cap. Admissions, selected cafe items, and selected meals count; transport does not. */
   budgetWon: number
   maxWalkingKm: number
   companion: Companion
@@ -193,6 +230,7 @@ export interface TripCostBreakdown {
   exhibitionWon: number
   performanceWon: number
   cafeWon: number
+  mealWon: number
   wifiWon: 0
   totalWon: number
 }
@@ -207,6 +245,16 @@ export interface TripTotals {
   stopCount: number
 }
 
+export interface TripGrounding {
+  /** Whether this plan came from evidence retrieved at request time or the local demo catalog. */
+  mode: "ragflow" | "demo"
+  provider: string
+  retrievedAt: string
+  retrievedChunkCount: number
+  acceptedPlaceCount: number
+  rejectedChunkCount: number
+}
+
 export interface TripPlan {
   id: string
   title: string
@@ -216,6 +264,8 @@ export interface TripPlan {
   costs: TripCostBreakdown
   totals: TripTotals
   warnings: readonly string[]
+  /** Optional for backward compatibility with plans saved before server-side retrieval was added. */
+  grounding?: TripGrounding
 }
 
 export const COMPANION_LABELS: Record<Companion, string> = {
@@ -232,6 +282,7 @@ export const INTEREST_LABELS: Record<Interest, string> = {
   "night-view": "전망·야경",
   walk: "산책",
   cafe: "카페",
+  food: "식사",
   performance: "공연",
   park: "공원",
   culture: "문화",
@@ -258,5 +309,6 @@ export const CATEGORY_LABELS: Record<PlaceCategory, string> = {
   "night-view": "야경",
   rest: "휴식",
   cafe: "카페",
+  restaurant: "식당",
   landmark: "명소",
 }

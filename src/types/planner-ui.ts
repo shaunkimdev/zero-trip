@@ -6,6 +6,7 @@ export type WantKey =
   | "night-view"
   | "walk"
   | "cafe"
+  | "food"
   | "performance"
   | "park"
   | "culture"

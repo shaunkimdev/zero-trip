@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { SEOUL_CLUSTER_ORIGINS, seoulPlaces } from "../data/seoul-places"
-import type { TripRequest } from "../types/trip"
+import type { Place, TripRequest } from "../types/trip"
 import { placeMatchesInterest, planTrip } from "./planner"
 
 const saturdayRequest: TripRequest = {
@@ -19,6 +19,45 @@ const saturdayRequest: TripRequest = {
 function timeToMinute(value: string): number {
   const [hours, minutes] = value.split(":").map(Number)
   return hours * 60 + minutes
+}
+
+const restaurantHours: Place["openingHours"] = {
+  sun: [{ open: "09:00", close: "22:00" }],
+  mon: [{ open: "09:00", close: "22:00" }],
+  tue: [{ open: "09:00", close: "22:00" }],
+  wed: [{ open: "09:00", close: "22:00" }],
+  thu: [{ open: "09:00", close: "22:00" }],
+  fri: [{ open: "09:00", close: "22:00" }],
+  sat: [{ open: "09:00", close: "22:00" }],
+}
+
+function restaurantPlace(
+  id: string,
+  minimumWon: number,
+  maximumWon: number,
+): Place {
+  return {
+    ...seoulPlaces[0],
+    id,
+    name: id,
+    category: "restaurant",
+    location: SEOUL_CLUSTER_ORIGINS.jongno,
+    recommendedVisitMinutes: 60,
+    price: {
+      kind: "paid",
+      basis: "per-person",
+      adultWon: null,
+      youthWon: null,
+      childWon: null,
+      minimumWon,
+      maximumWon,
+      note: "1인 메뉴 가격대",
+    },
+    openingHours: restaurantHours,
+    tags: ["food"],
+    companions: ["couple"],
+    avoidFlags: [],
+  }
 }
 
 describe("Seoul demo catalog", () => {
@@ -174,6 +213,37 @@ describe("planTrip", () => {
     expect(paidPlan.costs.cafeWon).toBeGreaterThan(0)
     expect(paidPlan.costs.totalWon).toBeLessThanOrEqual(10_000)
     expect(freePlan.costs.cafeWon).toBe(0)
+  })
+
+  it("budgets restaurants at the per-person maximum and records the cost as a meal", () => {
+    const affordable = restaurantPlace("restaurant-affordable", 2_000, 4_000)
+    const minimumOnlyAffordable = restaurantPlace("restaurant-over-budget", 1_000, 5_000)
+    const request: TripRequest = {
+      ...saturdayRequest,
+      startTime: "10:00",
+      endTime: "13:00",
+      budgetWon: 9_000,
+      maxWalkingKm: 1,
+      companion: "couple",
+      partySize: 2,
+      wants: ["food"],
+    }
+
+    const result = planTrip(request, [affordable, minimumOnlyAffordable])
+
+    expect(result.stops.map((stop) => stop.place.id)).toEqual([affordable.id])
+    expect(result.stops[0].costWon).toBe(affordable.price.maximumWon! * request.partySize!)
+    expect(result.costs.mealWon).toBe(8_000)
+    expect(result.costs.totalWon).toBe(8_000)
+    expect(result.costs.totalWon).toBeLessThanOrEqual(request.budgetWon)
+
+    const belowMaximumPlan = planTrip(
+      { ...request, budgetWon: 7_999 },
+      [affordable],
+    )
+    expect(belowMaximumPlan.stops).toHaveLength(0)
+    expect(belowMaximumPlan.costs.mealWon).toBe(0)
+    expect(belowMaximumPlan.costs.totalWon).toBeLessThanOrEqual(7_999)
   })
 
   it("returns a different top route for the next deterministic variant", () => {
