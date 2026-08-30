@@ -35,6 +35,7 @@ const EXTRA_PLACE_TAGS = [
   "family",
   "accessible",
   "pet-friendly",
+  "tour",
 ] as const
 
 const weekdaySet = new Set<string>(WEEKDAYS)

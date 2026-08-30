@@ -21,7 +21,7 @@ export function GeneratingCard({ stage }: { stage: number }) {
       <Card className="mx-auto max-w-4xl [--card-spacing:--spacing(7)]">
         <CardContent className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="flex flex-col justify-center">
-            <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground">
+            <span className="die-cut-sticker mb-5 grid size-14 place-items-center rounded-2xl border-[5px] border-white bg-black text-white">
               <Map className="size-5" />
             </span>
             <p className="text-xs font-bold tracking-[0.14em] text-success-foreground">BUILDING YOUR DAY</p>
@@ -39,10 +39,10 @@ export function GeneratingCard({ stage }: { stage: number }) {
                   <div
                     key={item.label}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors",
-                      done && "border-success/20 bg-success/7 text-foreground",
-                      active && "border-primary/20 bg-primary/5 text-foreground",
-                      !done && !active && "border-border/60 text-muted-foreground",
+                      "flex items-center gap-3 rounded-full px-3.5 py-3 text-sm transition-[color,background-color,box-shadow]",
+                      done && "bg-black/[.06] text-foreground",
+                      active && "bg-white text-foreground shadow-[0_8px_22px_rgba(0,0,0,.07)]",
+                      !done && !active && "bg-muted/70 text-muted-foreground",
                     )}
                   >
                     <span
@@ -68,7 +68,7 @@ export function GeneratingCard({ stage }: { stage: number }) {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-muted/65 p-5 ring-1 ring-border/70">
+          <div className="soft-inset rounded-3xl bg-muted/65 p-5">
             <div className="mb-5 flex items-center justify-between">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-7 w-16 rounded-full" />
@@ -77,7 +77,7 @@ export function GeneratingCard({ stage }: { stage: number }) {
               {[0, 1, 2, 3].map((item) => (
                 <div key={item} className="flex gap-3">
                   <Skeleton className="size-9 shrink-0 rounded-full" />
-                  <div className="flex-1 rounded-xl bg-card p-3 ring-1 ring-border/60">
+                  <div className="flex-1 rounded-2xl bg-card p-3 shadow-[0_7px_18px_rgba(0,0,0,.05)]">
                     <Skeleton className="h-3 w-20" />
                     <Skeleton className="mt-2 h-4 w-3/5" />
                     <Skeleton className="mt-3 h-3 w-4/5" />

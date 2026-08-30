@@ -11,18 +11,18 @@ interface AppHeaderProps {
 
 export function AppHeader({ savedCount, onSavedClick }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/76">
-      <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 bg-background/78 backdrop-blur-2xl supports-[backdrop-filter]:bg-background/68">
+      <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <a href="#top" aria-label="ZERO TRIP 홈">
           <BrandMark />
         </a>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="hidden h-8 gap-1.5 px-3 sm:inline-flex">
+          <Badge variant="outline" className="hidden h-9 gap-1.5 px-3.5 sm:inline-flex">
             <Database className="size-3.5 text-success-foreground" />
             공공데이터 샘플
           </Badge>
-          <Badge variant="secondary" className="h-8 gap-1.5 px-3">
+          <Badge variant="outline" className="hidden h-9 gap-1.5 px-3.5 min-[430px]:inline-flex">
             <MapPin className="size-3.5" />
             서울 베타
           </Badge>
@@ -32,7 +32,7 @@ export function AppHeader({ savedCount, onSavedClick }: AppHeaderProps) {
             size="icon-sm"
             onClick={onSavedClick}
             aria-label={`저장한 코스 ${savedCount}개`}
-            className="relative"
+            className="soft-control relative size-10 bg-white hover:bg-white"
           >
             <Bookmark className="size-4" />
             {savedCount > 0 ? (

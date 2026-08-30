@@ -30,10 +30,10 @@ export function ChoiceChip({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium outline-none transition-[background-color,color,box-shadow,transform] focus-visible:ring-[3px] focus-visible:ring-ring/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
         selected
-          ? "border-primary bg-primary text-primary-foreground shadow-xs"
-          : "border-border bg-background text-foreground hover:border-foreground/20 hover:bg-muted/70",
+          ? "bg-black text-white shadow-[0_10px_24px_rgba(0,0,0,.18)]"
+          : "bg-white text-foreground shadow-[0_8px_22px_rgba(0,0,0,.065)] hover:bg-[#f7f7f6] hover:shadow-[0_10px_28px_rgba(0,0,0,.09)]",
         type === "single" && "flex-1",
         className,
       )}

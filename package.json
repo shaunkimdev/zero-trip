@@ -8,7 +8,7 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "tsc -b && vite build",
     "build:server": "vite build --config vite.server.config.ts",
-    "start": "node server-dist/zero-trip-api.mjs",
+    "start": "node --env-file-if-exists=.env.local server-dist/zero-trip-api.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

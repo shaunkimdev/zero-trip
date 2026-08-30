@@ -8,6 +8,7 @@ export interface RagflowConfig {
   apiKey: string
   datasetIds: readonly string[]
   allowedSourceHosts: readonly string[]
+  fallbackToDemo: boolean
   maxSourceAgeDays: number
   pageSize: number
   similarityThreshold: number
@@ -33,9 +34,27 @@ export interface AirbyteConfig {
   requestTimeoutMs: number
 }
 
+export interface KmaConfig {
+  serviceKey: string
+  requestTimeoutMs: number
+}
+
+export interface KakaoConfig {
+  apiKey: string
+  requestTimeoutMs: number
+}
+
+export interface TourApiConfig {
+  serviceKey: string
+  requestTimeoutMs: number
+}
+
 export interface ZeroTripToolConfig {
   ragflow: ToolConfiguration<RagflowConfig>
   airbyte: ToolConfiguration<AirbyteConfig>
+  kma: ToolConfiguration<KmaConfig>
+  kakao: ToolConfiguration<KakaoConfig>
+  tourApi: ToolConfiguration<TourApiConfig>
   adminToken: string | null
   api: {
     planRateLimitPerMinute: number
@@ -141,6 +160,13 @@ function integerInRange(
   return parsed
 }
 
+function booleanSetting(input: string | undefined, fallback: boolean, label: string) {
+  if (input === undefined) return fallback
+  if (input === "true") return true
+  if (input === "false") return false
+  throw new Error(`${label} must be true or false.`)
+}
+
 function ragflowConfiguration(environment: Environment): ToolConfiguration<RagflowConfig> {
   if (!anyConfigured(environment, RAGFLOW_KEYS)) {
     return {
@@ -181,6 +207,11 @@ function ragflowConfiguration(environment: Environment): ToolConfiguration<Ragfl
         apiKey,
         datasetIds,
         allowedSourceHosts,
+        fallbackToDemo: booleanSetting(
+          value(environment, "RAGFLOW_FALLBACK_TO_DEMO"),
+          false,
+          "RAGFLOW_FALLBACK_TO_DEMO",
+        ),
         maxSourceAgeDays: integerInRange(
           value(environment, "RAGFLOW_MAX_SOURCE_AGE_DAYS"),
           30,
@@ -319,6 +350,43 @@ function airbyteConfiguration(environment: Environment): ToolConfiguration<Airby
   }
 }
 
+function optionalApiConfiguration<T>(
+  environment: Environment,
+  environmentKey: string,
+  label: string,
+  createConfig: (secret: string, requestTimeoutMs: number) => T,
+): ToolConfiguration<T> {
+  const secret = value(environment, environmentKey)
+  if (!secret) {
+    return {
+      state: "disabled",
+      config: null,
+      message: `${label} environment variable is not set.`,
+    }
+  }
+
+  try {
+    const requestTimeoutMs = integerInRange(
+      value(environment, "ZERO_TRIP_LIVE_API_TIMEOUT_MS"),
+      8_000,
+      1_000,
+      30_000,
+      "ZERO_TRIP_LIVE_API_TIMEOUT_MS",
+    )
+    return {
+      state: "configured",
+      config: createConfig(secret, requestTimeoutMs),
+      message: `${label} is configured.`,
+    }
+  } catch (error) {
+    return {
+      state: "misconfigured",
+      config: null,
+      message: error instanceof Error ? error.message : `${label} configuration is invalid.`,
+    }
+  }
+}
+
 export function loadToolConfig(environment: Environment): ZeroTripToolConfig {
   const configuredAdminToken = value(environment, "ZERO_TRIP_TOOLS_ADMIN_TOKEN")
   if (configuredAdminToken && configuredAdminToken.length < 24) {
@@ -327,6 +395,24 @@ export function loadToolConfig(environment: Environment): ZeroTripToolConfig {
   return {
     ragflow: ragflowConfiguration(environment),
     airbyte: airbyteConfiguration(environment),
+    kma: optionalApiConfiguration(
+      environment,
+      "KMA_SERVICE_KEY",
+      "KMA forecast API",
+      (serviceKey, requestTimeoutMs) => ({ serviceKey, requestTimeoutMs }),
+    ),
+    kakao: optionalApiConfiguration(
+      environment,
+      "KAKAO_REST_API_KEY",
+      "Kakao Local and routing API",
+      (apiKey, requestTimeoutMs) => ({ apiKey, requestTimeoutMs }),
+    ),
+    tourApi: optionalApiConfiguration(
+      environment,
+      "TOUR_API_SERVICE_KEY",
+      "Korea Tourism Organization TourAPI",
+      (serviceKey, requestTimeoutMs) => ({ serviceKey, requestTimeoutMs }),
+    ),
     adminToken: configuredAdminToken ?? null,
     api: {
       planRateLimitPerMinute: integerInRange(

@@ -16,6 +16,8 @@ interface RagflowRetrievalData {
   total?: number
 }
 
+const NO_CHUNKS_MESSAGE = /no chunk found!?\s*check the chunk status please!?/i
+
 export interface RagflowChunk {
   id: string
   content: string
@@ -106,6 +108,14 @@ export class RagflowClient {
         fetchImplementation: this.fetchImplementation,
       },
     )
+
+    if (
+      response.code === 102 &&
+      typeof response.message === "string" &&
+      NO_CHUNKS_MESSAGE.test(response.message)
+    ) {
+      return { chunks: [], total: 0 }
+    }
 
     if (response.code !== 0 || !response.data) {
       throw new ToolHttpError("RAGFlow rejected the retrieval request.", null, "ragflow")

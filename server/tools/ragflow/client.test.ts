@@ -8,6 +8,7 @@ const config: RagflowConfig = {
   apiKey: "secret-ragflow-key",
   datasetIds: ["places", "festivals"],
   allowedSourceHosts: ["data.seoul.go.kr"],
+  fallbackToDemo: false,
   maxSourceAgeDays: 30,
   pageSize: 30,
   similarityThreshold: 0.24,
@@ -83,6 +84,21 @@ describe("RagflowClient", () => {
     await expect(client.retrieve("서울 관광")).rejects.toThrow(
       "RAGFlow rejected the retrieval request.",
     )
+  })
+
+  it("normalizes RAGFlow's empty-index envelope to a valid no-hit result", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        code: 102,
+        message: "No chunk found! Check the chunk status please!",
+      }),
+    )
+    const client = new RagflowClient(config, fetchMock as typeof fetch)
+
+    await expect(client.retrieve("서울 관광")).resolves.toEqual({
+      total: 0,
+      chunks: [],
+    })
   })
 
   it("drops malformed chunk rows without trusting partial upstream data", async () => {

@@ -36,6 +36,29 @@ deployments. Plain HTTP is accepted only for localhost, unless the server-only
 escape hatch `ZERO_TRIP_ALLOW_INSECURE_TOOL_HTTP=true` is deliberately set for
 an isolated development network.
 
+### Live weather, place, and walking APIs
+
+The following optional server-only keys enrich both the demo catalog and
+RAGFlow-backed plans. `ZERO_TRIP_LIVE_API_TIMEOUT_MS` controls each request
+(`8000` by default, allowed range `1000..30000`). A failed enrichment never
+turns into fabricated data: the planner keeps its validated catalog and adds a
+warning or uses its existing walking estimate.
+
+| Variable | Runtime use |
+| --- | --- |
+| `KMA_SERVICE_KEY` | Calls KMA `getUltraSrtFcst` when the whole itinerary fits its approximately six-hour window, otherwise `getVilageFcst`, for the origin grid. Rain, snow, lightning, strong wind, or extreme temperatures remove outdoor candidates within the official forecast horizon. |
+| `TOUR_API_SERVICE_KEY` | Calls TourAPI `KorService2/locationBasedList2` near the origin. Only name-and-500m matches enrich already validated candidates with official address and coordinates; incomplete API rows never become new places. |
+| `KAKAO_REST_API_KEY` | Resolves selected place coordinates with Kakao Local and calls Kakao Maps walking routing for the full route. Exact leg times and distances are reapplied to opening-hour, trip-end, and walking-limit validation; an unavailable API falls back to the estimate, while a known constraint violation trims the route or fails closed. |
+
+The KMA and TourAPI public-data keys may be stored in either decoded or
+percent-encoded form. The server normalizes them before building the query so
+the credential is encoded exactly once.
+
+TourAPI and Kakao location matches are stored separately from each place's
+canonical `source`. This preserves the original price/opening-hours provenance
+while recording which external record supplied the verified address and
+coordinates.
+
 ### RAGFlow
 
 `RAGFLOW_BASE_URL`, `RAGFLOW_API_KEY`, `RAGFLOW_DATASET_IDS`, and
@@ -47,6 +70,7 @@ an isolated development network.
 | `RAGFLOW_API_KEY` | RAGFlow API key sent as a Bearer token | Required for live retrieval |
 | `RAGFLOW_DATASET_IDS` | Comma-separated dataset IDs searched by ZERO TRIP | At least one ID |
 | `RAGFLOW_ALLOWED_SOURCE_HOSTS` | Comma-separated provenance hostname allowlist | At least one hostname; no scheme/path |
+| `RAGFLOW_FALLBACK_TO_DEMO` | Explicitly allow a labelled demo plan when retrieval fails or yields no validated place | `false`; keep disabled in production |
 | `RAGFLOW_MAX_SOURCE_AGE_DAYS` | Oldest source update accepted at planning time | `30`; integer `1..3650` |
 | `RAGFLOW_PAGE_SIZE` | Maximum chunks requested per search | `30`; integer `1..100` |
 | `RAGFLOW_SIMILARITY_THRESHOLD` | Minimum accepted RAGFlow similarity | `0.2`; number `0..1` |
@@ -100,10 +124,11 @@ protected per API process by `ZERO_TRIP_PLAN_RATE_LIMIT_PER_MINUTE` (default
 should add their own distributed user/IP quota because in-process counters are
 not shared between replicas.
 
-RAGFlow and Airbyte credentials, connection IDs, and the administration token
-are server-only. Do not give any secret a `VITE_` prefix: Vite intentionally
-exposes `VITE_*` values to browser bundles. Browser code must call the ZERO
-TRIP backend and must never call RAGFlow or Airbyte with credentials directly.
+RAGFlow, Airbyte, KMA, Kakao, and TourAPI credentials, connection IDs, and the
+administration token are server-only. Do not give any secret a `VITE_` prefix:
+Vite intentionally exposes `VITE_*` values to browser bundles. Browser code
+must call the ZERO TRIP backend and must never call upstream tools with
+credentials directly.
 
 ## Server API
 
@@ -131,8 +156,11 @@ grounding data returned with the plan so demo data cannot be mistaken for live
 evidence.
 
 The successful response is `200 OK` with `{ "plan": TripPlan }`. A configured
-but unreachable RAGFlow returns an upstream error; the server does not silently
-replace live evidence with demo places.
+but unreachable RAGFlow returns an upstream error by default; the server does
+not silently replace live evidence with demo places. For local development,
+`RAGFLOW_FALLBACK_TO_DEMO=true` explicitly allows a labelled demo response when
+retrieval fails or returns no validated places. Keep the default `false` in
+production.
 
 The current planner budget covers admission, exhibition, performance, and any
 selected cafe or restaurant record. Cafe/restaurant records use the verified

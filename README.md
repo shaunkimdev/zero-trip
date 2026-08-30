@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-서울 주요 거점의 실시간 인구를 모두 표시하려면 [서울 열린데이터광장](https://data.seoul.go.kr/dataList/OA-21778/A/1/datasetView.do)에서 인증키를 발급받고 `.env.local`에 키를 설정합니다. 날씨 기반 추천과 실제 도보 경로에 사용할 기상청·카카오 키 항목도 미리 준비되어 있습니다.
+서울 주요 거점의 실시간 인구를 모두 표시하려면 [서울 열린데이터광장](https://data.seoul.go.kr/dataList/OA-21778/A/1/datasetView.do)에서 인증키를 발급받고 `.env.local`에 키를 설정합니다. 기상청 예보, Kakao 장소·도보 경로, TourAPI 관광정보 키도 같은 파일에 설정하면 추천 API가 실제 호출해 결과에 반영합니다.
 
 API 키 목록과 입력 방법은 [`API_KEYS.md`](./API_KEYS.md)에 따로 정리되어 있습니다. RAGFlow 검색과 Airbyte 동기화의 데이터 계약·관리 API·운영 절차는 [`docs/TOOL_INTEGRATIONS.md`](./docs/TOOL_INTEGRATIONS.md)에 정리되어 있습니다.
 
@@ -19,7 +19,7 @@ SEOUL_OPEN_DATA_KEY=발급받은_인증키
 
 키는 Vite 서버 프록시에서만 사용되어 브라우저 번들에 포함되지 않습니다. 키가 없으면 서울시가 허용하는 `광화문·덕수궁` 샘플 실시간 값만 표시됩니다.
 
-서울 인구 API는 로컬 개발 서버와 `vite preview`에서 동작합니다. RAGFlow·Airbyte 도구 API는 여기에 더해 `npm start`로 실행하는 독립 서버 번들로 배포할 수 있습니다. GitHub Pages처럼 정적 파일만 제공하는 배포에서는 API가 없는 명시적 데모 모드로 동작합니다. 서울시 원본 API가 HTTP로 제공되므로 인증키는 클라이언트에 넣지 않고 서버에서만 사용합니다.
+서울 인구 API는 로컬 개발 서버와 `vite preview`에서 동작합니다. 추천·RAGFlow·Airbyte 도구 API는 여기에 더해 `npm start`로 실행하는 독립 서버 번들로 배포할 수 있고, 이 명령도 루트의 `.env.local`을 읽습니다. GitHub Pages처럼 정적 파일만 제공하는 배포에서는 API가 없는 명시적 데모 모드로 동작합니다. 모든 비밀키는 클라이언트에 넣지 않고 서버에서만 사용합니다.
 
 프로덕션 빌드와 추천 엔진 테스트:
 
@@ -43,6 +43,9 @@ npm start
 - Haversine 도보 추정과 beam search 기반 경로 최적화
 - 일정 타임라인, 실제 서울 25개 구 GeoJSON 기반 Dot Atlas, 일정 비용, Wi-Fi SSID 표시
 - 서울시 공식 실시간 인구 API 기반 주요 거점 혼잡도·인구 범위·기준 시각 표시
+- 기상청 예보의 비·눈·강풍·낙뢰·극한 기온을 반영한 야외 후보 제외
+- TourAPI 주변 관광정보로 검증된 기존 후보의 주소·좌표 보강
+- Kakao 장소 검색 및 실제 구간별 도보 경로로 시간·거리 제약 재검증
 - RAGFlow 검색 결과의 가격·운영시간·좌표·출처를 strict schema로 검증한 뒤 추천 엔진에 연결
 - Airbyte 메인 DB/RAG 파이프라인 연결을 분리된 allowlist로 실행하고 job 상태를 조회하는 관리자 API
 - 다른 후보 경로 재생성, 로컬 저장·복원, 조건이 담긴 공유 링크
@@ -51,7 +54,7 @@ npm start
 
 ## 데이터 안내
 
-RAGFlow가 설정되지 않은 환경에서는 `src/data/seoul-places.ts`의 서울 데모 카탈로그를 사용합니다. 실제 장소를 참고하되 운영시간·가격·행사·카페 항목은 실시간 정보가 아니며, 화면에도 `데모 운영시간`으로 표시됩니다. RAGFlow가 설정된 환경에서는 검색 결과를 canonical `Place` 모델로 검증하고, 근거가 없거나 형식이 불완전한 장소를 데모 데이터로 대체하지 않습니다.
+RAGFlow가 설정되지 않은 환경에서는 `src/data/seoul-places.ts`의 서울 데모 카탈로그를 사용합니다. 실제 장소를 참고하되 운영시간·가격·행사·카페 항목은 실시간 정보가 아니며, 화면에도 `데모 운영시간`으로 표시됩니다. RAGFlow가 설정된 환경에서는 검색 결과를 canonical `Place` 모델로 검증하고, 근거가 없거나 형식이 불완전한 장소를 기본적으로 데모 데이터로 대체하지 않습니다. 로컬 개발에서는 `RAGFLOW_FALLBACK_TO_DEMO=true`를 명시한 경우에만 빈 인덱스나 일시적인 조회 실패 시 표시된 데모 카탈로그를 사용할 수 있습니다.
 
 지도는 `southkorea/seoul-maps`의 KOSTAT 2013 서울 자치구 단순 GeoJSON(Apache-2.0)을 로컬에 포함합니다. 브라우저에서 경계의 bounding box를 계산하고, 균일한 격자점을 point-in-polygon으로 판정한 뒤 SVG 원만 렌더링합니다. 출처와 기준연도는 지도 하단에 표시됩니다.
 
@@ -67,7 +70,7 @@ RAGFlow가 설정되지 않은 환경에서는 `src/data/seoul-places.ts`의 서
   → React UI
 ```
 
-가격이 `unknown`인 장소는 무료로 간주하지 않으며 추천에서 제외합니다. 카페·식당은 출처가 검증된 1인 가격대의 상한을 예산에 포함합니다. 교통비와 실시간 도로·대중교통 경로는 아직 포함하지 않으며, 현재 도보 시간은 좌표 간 거리를 보정한 추정치입니다.
+가격이 `unknown`인 장소는 무료로 간주하지 않으며 추천에서 제외합니다. 카페·식당은 출처가 검증된 1인 가격대의 상한을 예산에 포함합니다. 교통비와 실시간 도로·대중교통 경로는 아직 포함하지 않습니다. Kakao 키가 설정되고 경로가 모든 제약을 통과하면 실제 도보 시간을 사용합니다. API가 불가할 때만 명시된 추정치를 사용하고, 실제 경로가 제약을 위반하면 코스를 줄이거나 안전하게 빈 결과를 반환합니다.
 
 ## 주요 구조
 
@@ -84,8 +87,11 @@ server/
   tools/
     ragflow/        검색 HTTP 클라이언트와 canonical 장소 검증 어댑터
     airbyte/        인증·동기화 job 클라이언트와 연결 그룹 관리
+    kma/            기상청 예보 클라이언트와 격자 변환
+    kakao/          Kakao 장소 검색·도보 경로 클라이언트
+    tour-api/       TourAPI 주변 관광정보 클라이언트
     shared/         서버 전용 환경설정과 timeout/error 처리
-    tool-manager.ts 두 도구를 추천·운영 흐름에 연결하는 공통 관리 계층
+    tool-manager.ts 외부 도구를 추천·운영 흐름에 연결하는 공통 관리 계층
     api.ts          추천/상태/관리자 API용 서버 미들웨어
 ```
 

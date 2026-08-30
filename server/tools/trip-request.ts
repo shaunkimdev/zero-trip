@@ -2,15 +2,18 @@ import {
   AVOIDANCES,
   COMPANIONS,
   INTERESTS,
+  TRANSPORT_MODES,
   type Avoidance,
   type Companion,
   type Interest,
+  type TransportMode,
   type TripRequest,
 } from "../../src/types/trip.ts"
 
 const companions = new Set<string>(COMPANIONS)
 const interests = new Set<string>(INTERESTS)
 const avoidances = new Set<string>(AVOIDANCES)
+const transportModes = new Set<string>(TRANSPORT_MODES)
 
 function object(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -63,12 +66,16 @@ export function parseTripRequest(payload: unknown): TripRequest {
   const row = object("request" in wrapper ? wrapper.request : wrapper)
   const origin = object(row.origin)
   const companion = row.companion
+  const transportMode = row.transportMode ?? "transit"
   const date = row.date
   if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new TypeError("date는 YYYY-MM-DD 형식이어야 합니다.")
   }
   if (typeof companion !== "string" || !companions.has(companion)) {
     throw new RangeError("지원하지 않는 동행 유형입니다.")
+  }
+  if (typeof transportMode !== "string" || !transportModes.has(transportMode)) {
+    throw new RangeError("지원하지 않는 이동수단입니다.")
   }
 
   const partySize = row.partySize === undefined
@@ -89,6 +96,7 @@ export function parseTripRequest(payload: unknown): TripRequest {
         ? { label: origin.label.trim().slice(0, 100) }
         : {}),
     },
+    transportMode: transportMode as TransportMode,
     date,
     startTime: time(row.startTime, "startTime"),
     endTime: time(row.endTime, "endTime"),

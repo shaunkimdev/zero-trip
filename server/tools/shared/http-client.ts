@@ -1,10 +1,12 @@
 export type Fetch = typeof fetch
 
+export type ToolName = "ragflow" | "airbyte" | "kma" | "kakao" | "tour-api"
+
 export class ToolHttpError extends Error {
   constructor(
     message: string,
     readonly status: number | null,
-    readonly tool: "ragflow" | "airbyte",
+    readonly tool: ToolName,
   ) {
     super(message)
     this.name = "ToolHttpError"
@@ -12,7 +14,7 @@ export class ToolHttpError extends Error {
 }
 
 interface JsonRequestOptions {
-  tool: "ragflow" | "airbyte"
+  tool: ToolName
   timeoutMs: number
   fetchImplementation?: Fetch
 }

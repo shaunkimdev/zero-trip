@@ -1,7 +1,10 @@
 import {
+  BusFront,
   CalendarDays,
+  CarFront,
   Check,
   Clock3,
+  Footprints,
   MapPin,
   ShieldCheck,
   Sparkles,
@@ -44,6 +47,23 @@ const wantsLabels: Record<string, string> = {
   rest: "휴식",
 }
 
+const transportLabels = {
+  walk: "도보",
+  transit: "대중교통",
+  car: "차량",
+} as const
+
+const transportConditionLabels = {
+  ...transportLabels,
+  transit: "대중교통(지하철·버스)",
+} as const
+
+const transportIcons = {
+  walk: Footprints,
+  transit: BusFront,
+  car: CarFront,
+} as const
+
 function formatTime(minutes: number) {
   if (minutes === 24 * 60) return "24:00"
   const hour = Math.floor(minutes / 60)
@@ -64,13 +84,14 @@ function dateLabel(value: string) {
 export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryProps) {
   const budgetText = values.budget === 0 ? "0원" : `${values.budget.toLocaleString("ko-KR")}원`
   const endTime = formatTime(values.startMin + values.durationMin)
+  const TransportIcon = transportIcons[values.transportMode]
 
   return (
     <div className="space-y-4 lg:sticky lg:top-24">
-      <Card className="relative isolate overflow-hidden border-0 bg-primary py-0 text-primary-foreground ring-0 shadow-[0_24px_60px_rgba(24,66,48,0.2)]">
+      <Card className="relative isolate overflow-hidden bg-black py-0 text-white shadow-[0_28px_70px_rgba(0,0,0,.22),0_8px_22px_rgba(0,0,0,.12)]">
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 opacity-30 [background-image:radial-gradient(circle_at_80%_10%,oklch(0.91_0.14_125)_0,transparent_30%),linear-gradient(to_right,transparent_49%,rgba(255,255,255,.06)_50%,transparent_51%)] [background-size:auto,26px_26px]"
+          className="absolute inset-0 -z-10 opacity-55 [background-image:radial-gradient(circle_at_82%_8%,rgba(255,255,255,.24)_0,transparent_31%),radial-gradient(circle_at_12%_92%,rgba(255,255,255,.08)_0,transparent_25%)]"
         />
         <CardHeader className="gap-4 px-6 pt-6 pb-0 sm:px-7 sm:pt-7">
           <div className="flex items-center justify-between gap-3">
@@ -85,7 +106,7 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
         </CardHeader>
 
         <CardContent className="px-6 pt-5 pb-7 sm:px-7">
-          <div className="rounded-2xl bg-white/[0.075] p-4 ring-1 ring-white/12 backdrop-blur-sm">
+          <div className="rounded-3xl bg-white/[0.09] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.16)] backdrop-blur-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-medium text-primary-foreground/60">오늘 쓸 예산</p>
@@ -102,15 +123,16 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
               <SummaryItem icon={MapPin} text={values.originLabel} />
               <SummaryItem icon={CalendarDays} text={dateLabel(values.date)} />
               <SummaryItem icon={Clock3} text={`${formatTime(values.startMin)}–${endTime}`} />
+              <SummaryItem icon={TransportIcon} text={transportLabels[values.transportMode]} />
             </div>
           </div>
 
-          <div className="my-6 overflow-hidden rounded-xl bg-[#f8f7f4] ring-1 ring-white/15">
+          <div className="my-6 overflow-hidden rounded-3xl bg-[#f5f5f3] shadow-[0_12px_28px_rgba(0,0,0,.18)]">
             <SeoulDotSilhouette
               origin={{ lat: values.lat, lng: values.lng }}
               className="mx-auto h-32 w-[86%]"
             />
-            <p className="border-t border-black/8 px-4 py-2 text-center text-[10px] font-medium text-[#596159]">
+            <p className="px-4 py-2.5 text-center text-[10px] font-medium text-[#596159]">
               실제 서울 행정경계를 점으로 샘플링했어요
             </p>
           </div>
@@ -131,8 +153,12 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
             <div className="flex gap-2.5 text-sm leading-6">
               <Check className="mt-1 size-4 shrink-0 text-accent" />
               <p>
-                검증된 일정 비용 <strong>{budgetText} 이하</strong>만 담아요.
+                <strong>{transportConditionLabels[values.transportMode]}</strong> 기준으로 이동시간을 계산해요.
               </p>
+            </div>
+            <div className="flex gap-2.5 text-sm leading-6">
+              <Check className="mt-1 size-4 shrink-0 text-accent" />
+              <p>검증된 일정 비용 <strong>{budgetText} 이하</strong>만 담아요.</p>
             </div>
           </div>
 
@@ -140,7 +166,7 @@ export function PlannerSummary({ values, onSubmit, generating }: PlannerSummaryP
             type="button"
             variant="lime"
             size="lg"
-            className="mt-7 hidden w-full shadow-[0_8px_30px_rgba(195,241,80,0.14)] lg:flex"
+            className="mt-7 hidden w-full shadow-[0_12px_30px_rgba(0,0,0,.24)] lg:flex"
             onClick={onSubmit}
             disabled={generating}
           >

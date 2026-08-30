@@ -5,10 +5,10 @@ export function BrandMark({ className }: { className?: string }) {
     <div className={cn("flex items-center gap-2.5", className)}>
       <div
         aria-hidden="true"
-        className="relative grid size-8 place-items-center rounded-[10px] bg-primary text-primary-foreground shadow-sm"
+        className="die-cut-sticker relative grid size-9 place-items-center rounded-[13px] border-[3px] border-white bg-black text-white"
       >
         <span className="-translate-y-px text-[16px] font-extrabold tracking-[-0.08em]">₩0</span>
-        <span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-background bg-accent" />
+        <span className="absolute -right-1 -bottom-1 size-3 rounded-full border-[3px] border-white bg-black" />
       </div>
       <div className="leading-none">
         <div className="text-[15px] font-extrabold tracking-[-0.035em]">ZERO TRIP</div>

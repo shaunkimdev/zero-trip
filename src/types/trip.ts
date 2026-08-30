@@ -8,6 +8,10 @@ export const COMPANIONS = [
 
 export type Companion = (typeof COMPANIONS)[number]
 
+export const TRANSPORT_MODES = ["walk", "transit", "car"] as const
+
+export type TransportMode = (typeof TRANSPORT_MODES)[number]
+
 export const INTERESTS = [
   "free",
   "exhibition",
@@ -158,11 +162,34 @@ export type PlaceTag =
   | "family"
   | "accessible"
   | "pet-friendly"
+  | "tour"
 
 export interface PlaceSource {
   name: string
   url?: string
   updatedAt: string
+}
+
+export interface PlaceExternalReferences {
+  tourApi?: {
+    contentId: string
+    matchedAt: string
+    modifiedAt?: string
+  }
+  kakao?: {
+    placeId: string
+    matchedAt: string
+    placeUrl?: string
+  }
+}
+
+export interface PlaceImage {
+  /** Full-size public image URL. */
+  url: string
+  /** Smaller rendition used in itinerary cards when available. */
+  thumbnailUrl?: string
+  alt: string
+  sourceName: string
 }
 
 export interface Place {
@@ -183,11 +210,17 @@ export interface Place {
   amenities: PlaceAmenities
   crowdLevel: CrowdLevel
   source: PlaceSource
+  /** Location/address matches; price and opening-hours provenance remains in `source`. */
+  externalReferences?: PlaceExternalReferences
+  /** Representative photos supplied by a rights-cleared public source. */
+  images?: readonly PlaceImage[]
   availabilityNote?: string
 }
 
 export interface TripRequest {
   origin: GeoPoint & { label?: string }
+  /** Primary transport used between itinerary stops. */
+  transportMode: TransportMode
   /** A Date or an ISO date string (YYYY-MM-DD), interpreted in Asia/Seoul. */
   date: string | Date
   startTime: string
@@ -220,9 +253,11 @@ export interface PlannedStop {
 export interface RouteLeg {
   fromId: "origin" | string
   toId: string
-  mode: "walk"
+  mode: TransportMode
   distanceMeters: number
   durationMinutes: number
+  /** Omitted on plans saved before live walking routes were added. */
+  provider?: "estimate" | "kakao"
 }
 
 export interface TripCostBreakdown {
@@ -255,6 +290,27 @@ export interface TripGrounding {
   rejectedChunkCount: number
 }
 
+export type TripIntegrationState = "applied" | "skipped" | "unavailable"
+
+export interface TripIntegrationReport {
+  kma?: {
+    state: TripIntegrationState
+    forecastPointCount: number
+    outdoorPlacesExcluded: number
+    issuedAt?: string
+  }
+  kakao?: {
+    state: TripIntegrationState
+    matchedPlaceCount: number
+    routeApplied: boolean
+  }
+  tourApi?: {
+    state: TripIntegrationState
+    resultCount: number
+    matchedPlaceCount: number
+  }
+}
+
 export interface TripPlan {
   id: string
   title: string
@@ -264,6 +320,10 @@ export interface TripPlan {
   costs: TripCostBreakdown
   totals: TripTotals
   warnings: readonly string[]
+  /** Kakao walking directions when the returned exact route passed every planner constraint. */
+  directionsUrl?: string
+  /** Server-side integration outcomes; secrets are never included. */
+  integrations?: TripIntegrationReport
   /** Optional for backward compatibility with plans saved before server-side retrieval was added. */
   grounding?: TripGrounding
 }

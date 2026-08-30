@@ -1,6 +1,8 @@
 import {
   Baby,
+  BusFront,
   Camera,
+  CarFront,
   Coffee,
   Footprints,
   Heart,
@@ -33,6 +35,7 @@ import {
   type PlannerValues,
   type WantKey,
 } from "@/types/planner-ui"
+import type { TransportMode } from "@/types/trip"
 
 interface PlannerFormProps {
   values: PlannerValues
@@ -65,6 +68,12 @@ const wantOptions = [
   { value: "rest" as const, label: "휴식", icon: Umbrella },
 ]
 
+const transportOptions = [
+  { value: "walk" as const, label: "도보", description: "가까운 장소 위주", icon: Footprints },
+  { value: "transit" as const, label: "대중교통", description: "지하철 · 버스", icon: BusFront },
+  { value: "car" as const, label: "차량", description: "운전 · 주차 고려", icon: CarFront },
+]
+
 const startTimes = Array.from({ length: 25 }, (_, index) => {
   const value = 9 * 60 + index * 30
   const hour = Math.floor(value / 60)
@@ -88,7 +97,7 @@ function SectionTitle({
 }) {
   return (
     <div className="mb-4 flex items-start gap-3">
-      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-secondary text-[10px] font-bold text-secondary-foreground">
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-black text-[10px] font-bold text-white shadow-[0_7px_16px_rgba(0,0,0,.16)]">
         {step}
       </span>
       <div>
@@ -100,7 +109,7 @@ function SectionTitle({
 }
 
 function Divider() {
-  return <div className="my-7 h-px bg-border/80" />
+  return <div className="my-8 h-px bg-gradient-to-r from-transparent via-black/[.07] to-transparent" />
 }
 
 export function PlannerForm({
@@ -136,7 +145,7 @@ export function PlannerForm({
         event.preventDefault()
         onSubmit()
       }}
-      className="rounded-2xl bg-card p-5 ring-1 ring-foreground/9 shadow-[0_1px_2px_rgba(20,30,24,0.035)] transition-opacity sm:p-7 aria-busy:opacity-75"
+      className="soft-card rounded-[2rem] bg-card p-5 transition-opacity sm:p-8 aria-busy:opacity-75"
     >
       <fieldset>
         <legend className="sr-only">여행 출발 위치</legend>
@@ -163,7 +172,7 @@ export function PlannerForm({
                   })
                 }
               }}
-              className="h-12 w-full appearance-none rounded-xl border border-input bg-background pr-10 pl-10 text-sm font-medium outline-none transition focus:border-ring focus:ring-[3px] focus:ring-ring/20"
+              className="soft-inset h-12 w-full appearance-none rounded-full bg-[#f1f1ef] pr-10 pl-11 text-sm font-medium outline-none transition focus:ring-[3px] focus:ring-ring/20"
             >
               {values.originKey === "current" ? <option value="current">{values.originLabel}</option> : null}
               {ORIGINS.map((origin) => (
@@ -197,9 +206,47 @@ export function PlannerForm({
       <Divider />
 
       <fieldset>
-        <legend className="sr-only">여행 예산</legend>
+        <legend className="sr-only">이동수단</legend>
         <SectionTitle
           step="02"
+          title="어떻게 이동할까요?"
+          description="선택한 이동수단에 맞춰 장소 간 거리와 이동시간을 계산해요."
+        />
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="이동수단 선택">
+          {transportOptions.map((option) => {
+            const Icon = option.icon
+            const selected = values.transportMode === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => set("transportMode", option.value as TransportMode)}
+                className={cn(
+                  "flex min-h-24 flex-col items-center justify-center gap-1 rounded-[999px] px-2 py-3 text-center outline-none transition-[background-color,color,box-shadow,transform] focus-visible:ring-[3px] focus-visible:ring-ring/20 active:scale-[0.98]",
+                  selected
+                    ? "bg-black text-white shadow-[0_12px_28px_rgba(0,0,0,.2)]"
+                    : "bg-white text-foreground shadow-[0_9px_24px_rgba(0,0,0,.07)] hover:bg-[#f8f8f7] hover:shadow-[0_12px_28px_rgba(0,0,0,.1)]",
+                )}
+              >
+                <Icon className="mb-1 size-5" aria-hidden="true" />
+                <span className="text-sm font-bold">{option.label}</span>
+                <span className={cn("text-[10px]", selected ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                  {option.description}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      <Divider />
+
+      <fieldset>
+        <legend className="sr-only">여행 예산</legend>
+        <SectionTitle
+          step="03"
           title="쓸 수 있는 예산"
           description="관광·전시·공연과 선택한 카페·식당 가격대 상한까지 계산해요."
         />
@@ -235,10 +282,10 @@ export function PlannerForm({
               aria-pressed={values.budget === amount}
               onClick={() => set("budget", amount)}
               className={cn(
-                "min-h-9 rounded-lg border px-1 text-[11px] font-semibold outline-none transition focus-visible:ring-[3px] focus-visible:ring-ring/20",
+                "min-h-9 rounded-full px-1 text-[11px] font-semibold outline-none transition focus-visible:ring-[3px] focus-visible:ring-ring/20",
                 values.budget === amount
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background hover:bg-muted",
+                  ? "bg-black text-white shadow-[0_8px_18px_rgba(0,0,0,.17)]"
+                  : "bg-white shadow-[0_6px_16px_rgba(0,0,0,.06)] hover:bg-muted",
               )}
             >
               {amount === 0 ? "0원" : `${amount / 10_000}만원`}
@@ -251,7 +298,7 @@ export function PlannerForm({
 
       <fieldset>
         <legend className="sr-only">여행 날짜와 시간</legend>
-        <SectionTitle step="03" title="언제, 얼마나 놀까요?" />
+        <SectionTitle step="04" title="언제, 얼마나 놀까요?" />
         <div className="grid grid-cols-2 gap-3">
           <label className="grid gap-1.5 text-xs font-semibold">
             날짜
@@ -272,7 +319,7 @@ export function PlannerForm({
                     : [...durationOptions].reverse().find((item) => item.value <= maxDuration)?.value ?? 180
                 onChange({ ...values, date, startMin, durationMin })
               }}
-              className="h-11 min-w-0 rounded-xl border border-input bg-background px-3 text-sm font-medium outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/20"
+              className="soft-inset h-11 min-w-0 rounded-full bg-[#f1f1ef] px-4 text-sm font-medium outline-none focus:ring-[3px] focus:ring-ring/20"
             />
           </label>
           <label className="grid gap-1.5 text-xs font-semibold">
@@ -288,7 +335,7 @@ export function PlannerForm({
                     : [...durationOptions].reverse().find((item) => item.value <= maxDuration)?.value ?? 180
                 onChange({ ...values, startMin, durationMin })
               }}
-              className="h-11 min-w-0 rounded-xl border border-input bg-background px-3 text-sm font-medium outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/20"
+              className="soft-inset h-11 min-w-0 rounded-full bg-[#f1f1ef] px-4 text-sm font-medium outline-none focus:ring-[3px] focus:ring-ring/20"
             >
               {startTimes.map((time) => (
                 <option
@@ -321,7 +368,7 @@ export function PlannerForm({
       <fieldset>
         <legend className="sr-only">동행자</legend>
         <SectionTitle
-          step="04"
+          step="05"
           title="누구와 가나요?"
           description="추천 분위기를 맞추고, 비용은 동행 인원과 관계없이 1인 기준으로 보여줘요."
         />
@@ -344,7 +391,7 @@ export function PlannerForm({
 
       <fieldset>
         <legend className="sr-only">원하는 활동</legend>
-        <SectionTitle step="05" title="하고 싶은 것" description="마음 가는 대로 여러 개 골라도 좋아요." />
+        <SectionTitle step="06" title="하고 싶은 것" description="마음 가는 대로 여러 개 골라도 좋아요." />
         <div className="flex flex-wrap gap-2">
           {wantOptions.map((option) => (
             <ChoiceChip

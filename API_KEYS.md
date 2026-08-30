@@ -11,21 +11,21 @@ SEOUL_OPEN_DATA_KEY=서울_열린데이터광장_일반_인증키
 # 날씨 기반 코스 추천 연동용입니다.
 KMA_SERVICE_KEY=공공데이터포털_기상청_서비스키
 
-# 실제 장소 검색과 도보·대중교통 경로 연동용입니다.
+# 실제 장소 검색과 도보 경로 연동용입니다.
 KAKAO_REST_API_KEY=카카오디벨로퍼스_REST_API_키
 ```
 
 | 환경 변수 | 우선순위 | 사용 범위 | 발급·신청 |
 | --- | --- | --- | --- |
 | `SEOUL_OPEN_DATA_KEY` | 필수·연결 완료 | 지정 121개 주요장소 실시간 인구. 같은 일반 키로 서울 도시데이터의 현재 날씨·환경·도로·대중교통·문화행사도 확장 가능 | [서울 실시간 인구데이터](https://data.seoul.go.kr/dataList/OA-21778/A/1/datasetView.do) · [서울 실시간 도시데이터](https://data.seoul.go.kr/dataList/OA-21285/A/1/datasetView.do) |
-| `KMA_SERVICE_KEY` | 필수·다음 연동 | 초단기실황, 6시간 초단기예보, 단기예보의 강수·기온·풍속을 코스 시간대에 적용 | [기상청 단기예보 조회서비스](https://www.data.go.kr/data/15084084/openapi.do) |
-| `KAKAO_REST_API_KEY` | 권장·다음 연동 | 장소/카페 검색, 주소↔좌표 변환, 실제 도보·대중교통 경로와 이동시간 | [카카오 로컬 API](https://developers.kakao.com/docs/ko/local/dev-guide) · [카카오 REST API](https://developers.kakao.com/docs/ko/rest-api/reference) |
+| `KMA_SERVICE_KEY` | 권장·연결 완료 | 임박한 일정은 초단기예보, 이후 일정은 단기예보를 조회해 비·눈·강풍·낙뢰·극한 기온일 때 야외 후보 제외 | [기상청 단기예보 조회서비스](https://www.data.go.kr/data/15084084/openapi.do) |
+| `KAKAO_REST_API_KEY` | 권장·연결 완료 | 추천 장소명 검색으로 좌표·주소 확인, 최종 코스의 실제 도보 경로·거리·시간 적용 | [카카오 로컬 API](https://developers.kakao.com/docs/ko/local/dev-guide) · [카카오맵 REST API](https://developers.kakao.com/docs/ko/kakaomap/rest-api) |
 
-서울 도시데이터에 현재 날씨가 포함되지만, 사용자가 선택한 미래 시간대의 비·기온을 판단하려면 기상청 예보 키가 별도로 필요합니다. 날씨 연동 시 비·폭염·한파·강풍에는 산책과 야외 장소 점수를 낮추고 실내 후보를 우선하도록 사용할 예정입니다.
+서울 도시데이터에 현재 날씨가 포함되지만, 사용자가 선택한 미래 시간대 판단에는 기상청 예보 키가 별도로 필요합니다. 일정 전체가 최신 약 6시간 범위에 들면 `getUltraSrtFcst`, 그 밖에는 `getVilageFcst`를 사용합니다. 공식 단기예보 제공 범위를 벗어난 날짜에는 기존 장소 조건으로 추천하고 화면에 그 사실을 표시합니다.
 
 ## 선택 기능용 키
 
-아래 값은 기능을 실제로 추가할 때만 입력하면 됩니다. 지금 비어 있어도 앱 실행에는 문제가 없습니다.
+TourAPI는 현재 위치·주소 보강에 연결되어 있습니다. 나머지 값은 기능을 실제로 추가할 때만 입력하면 되며 비어 있어도 앱 실행에는 문제가 없습니다.
 
 ```dotenv
 # 관광지·행사·숙박·사진·반려동물 동반 관광정보
@@ -41,7 +41,7 @@ SEOUL_BUS_SERVICE_KEY=
 
 | 환경 변수 | 필요한 경우 | 발급·신청 |
 | --- | --- | --- |
-| `TOUR_API_SERVICE_KEY` | 데모 장소 목록을 실제 관광지·행사·이미지 데이터로 교체하거나 전국으로 확장 | [한국관광공사 국문 관광정보 서비스](https://www.data.go.kr/data/15101578/openapi.do) |
+| `TOUR_API_SERVICE_KEY` | 주변 공식 관광정보를 조회하고 기존 검증 후보와 이름·500m 이내 좌표가 일치할 때 주소와 좌표를 보강. API에 가격·주간 운영시간이 없는 신규 장소는 자동 추천하지 않음 | [한국관광공사 국문 관광정보 서비스](https://www.data.go.kr/data/15101578/openapi.do) |
 | `AIRKOREA_SERVICE_KEY` | 서울 밖의 미세먼지·초미세먼지·오존까지 산책 적합도에 반영 | [에어코리아 대기오염정보](https://www.data.go.kr/data/15073861/openapi.do) |
 | `SEOUL_SUBWAY_API_KEY` | 역별 실시간 도착 전광판 수준의 정보를 직접 조회 | [서울 열린데이터광장 인증키 신청](https://data.seoul.go.kr/together/mypage/actkeyMain.do) |
 | `SEOUL_BUS_SERVICE_KEY` | 정류장별 서울 버스 도착정보를 직접 조회 | [서울 버스도착정보 조회](https://www.data.go.kr/data/15000314/openapi.do) |
@@ -57,6 +57,7 @@ RAGFLOW_BASE_URL=https://ragflow.example.com
 RAGFLOW_API_KEY=서버_API_키
 RAGFLOW_DATASET_IDS=서울_관광_dataset_id
 RAGFLOW_ALLOWED_SOURCE_HOSTS=data.seoul.go.kr
+RAGFLOW_FALLBACK_TO_DEMO=false
 
 AIRBYTE_API_URL=https://api.airbyte.com/v1
 AIRBYTE_CLIENT_ID=application_client_id
@@ -85,6 +86,17 @@ Airbyte는 고정 `AIRBYTE_ACCESS_TOKEN`도 지원하지만, 만료 시간이 �
 ```powershell
 npm run dev
 ```
+
+`RAGFLOW_FALLBACK_TO_DEMO=true`는 RAGFlow 청크가 아직 준비되지 않았거나 조회가 실패했을 때 화면에 명확히 표시되는 데모 카탈로그로 코스 생성을 계속하는 로컬 개발용 선택지입니다. 운영에서는 검증되지 않은 대체 데이터를 막기 위해 기본값 `false`를 유지하세요.
+
+`npm run build` 후 `npm start`로 실행할 때도 Node 22의 `--env-file-if-exists=.env.local` 옵션으로 같은 파일을 읽습니다. 배포 환경에서는 파일 대신 호스팅 플랫폼의 Secret/환경변수 설정에 등록하세요.
+
+## 추천에서 실제로 사용하는 방식
+
+- KMA: 출발 좌표를 기상 격자(`nx`, `ny`)로 변환하고 일정 시점에 따라 초단기 또는 단기예보를 조회합니다. 위험 날씨에는 `outdoors` 제약이나 `outdoor` 태그가 있는 장소를 후보에서 제외합니다.
+- TourAPI: 출발지 주변 `locationBasedList2` 결과와 기존 후보를 이름 및 500m 이내 좌표로 교차 확인하고, 일치한 장소의 공식 주소와 좌표만 반영합니다. 가격과 운영시간은 추측하지 않으며 위치 보강 출처는 별도 참조 정보로 남깁니다.
+- Kakao: 1차 추천 장소를 키워드 검색으로 확인한 뒤 최대 5개 경유지를 포함한 도보 경로를 한 번에 조회합니다. 반환된 구간별 거리·시간으로 운영시간, 종료시간, 도보 한도를 다시 검사하며 조건을 넘으면 안전한 앞부분만 남기고 그것도 불가능하면 장소 없는 결과로 닫습니다. API 자체가 일시 실패한 경우에만 기존 추정 경로를 명확히 표시합니다.
+- 세 API가 일시 실패해도 추천 전체를 실패시키지 않고 기존 검증 데이터·추정 경로로 복구하며, 결과의 연동 상태와 경고에 실패 사실을 남깁니다.
 
 `SEOUL_OPEN_DATA_KEY=sample`을 유지하면 서울시 공식 샘플 범위인 `광화문·덕수궁` 한 곳의 실시간 값만 표시됩니다.
 

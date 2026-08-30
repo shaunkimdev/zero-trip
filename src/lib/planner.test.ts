@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest"
 
 import { SEOUL_CLUSTER_ORIGINS, seoulPlaces } from "../data/seoul-places"
-import type { Place, TripRequest } from "../types/trip"
-import { placeMatchesInterest, planTrip } from "./planner"
+import type { Place, TripPlan, TripRequest } from "../types/trip"
+import {
+  estimateTravelLeg,
+  placeMatchesInterest,
+  planTrip,
+  retimeTripPlanWithWalkingLegs,
+} from "./planner"
 
 const saturdayRequest: TripRequest = {
   origin: SEOUL_CLUSTER_ORIGINS.jongno,
+  transportMode: "walk",
   date: "2026-08-15",
   startTime: "10:00",
   endTime: "20:00",
@@ -73,6 +79,33 @@ describe("Seoul demo catalog", () => {
   })
 })
 
+describe("transport estimates", () => {
+  it("uses transit travel time while counting only station access as walking", () => {
+    const from = SEOUL_CLUSTER_ORIGINS.jongno
+    const to = SEOUL_CLUSTER_ORIGINS["yeouido-mapo"]
+    const walking = estimateTravelLeg(from, to, "walk")
+    const transit = estimateTravelLeg(from, to, "transit")
+
+    expect(transit.leg.mode).toBe("transit")
+    expect(transit.leg.durationMinutes).toBeLessThan(walking.leg.durationMinutes)
+    expect(transit.walkingMeters).toBeLessThan(transit.leg.distanceMeters)
+  })
+
+  it("keeps route legs in the requested transport mode", () => {
+    const result = planTrip({
+      ...saturdayRequest,
+      transportMode: "transit",
+      maxWalkingKm: 3,
+    })
+
+    expect(result.legs.length).toBeGreaterThan(0)
+    expect(result.legs.every((leg) => leg.mode === "transit")).toBe(true)
+    expect(result.totals.walkingMeters).toBeLessThanOrEqual(3_000)
+    expect(result.legs.reduce((sum, leg) => sum + leg.distanceMeters, 0))
+      .toBeGreaterThan(result.totals.walkingMeters)
+  })
+})
+
 describe("planTrip", () => {
   it("keeps every hard budget, walking and time invariant", () => {
     const request: TripRequest = {
@@ -115,6 +148,46 @@ describe("planTrip", () => {
     expect(result.costs.totalWon).toBe(0)
     expect(result.stops.every((stop) => stop.place.price.kind === "free")).toBe(true)
     expect(result.stops.some((stop) => stop.place.price.kind === "unknown")).toBe(false)
+  })
+
+  it("surfaces practical free street tours instead of only museums", () => {
+    const routeCases = [
+      {
+        origin: SEOUL_CLUSTER_ORIGINS.seongsu,
+        expectedId: "seongsu-popup-store-tour",
+        wants: ["free", "exhibition", "culture", "walk"] as const,
+      },
+      {
+        origin: SEOUL_CLUSTER_ORIGINS.jongno,
+        expectedId: "cheonggyecheon-stream",
+        wants: ["free", "culture", "walk"] as const,
+      },
+      {
+        origin: SEOUL_CLUSTER_ORIGINS["yeouido-mapo"],
+        expectedId: "hongdae-cultural-street-tour",
+        wants: ["free", "culture", "walk", "photo"] as const,
+      },
+    ]
+
+    for (const routeCase of routeCases) {
+      const result = planTrip(
+        {
+          ...saturdayRequest,
+          origin: routeCase.origin,
+          transportMode: "transit",
+          startTime: "11:00",
+          endTime: "13:00",
+          maxWalkingKm: 3,
+          wants: [...routeCase.wants],
+        },
+        seoulPlaces,
+        { maxStops: 1 },
+      )
+
+      expect(result.stops[0]?.place.id).toBe(routeCase.expectedId)
+      expect(result.stops[0]?.place.tags).toContain("tour")
+      expect(result.stops[0]?.place.price.kind).toBe("free")
+    }
   })
 
   it("changes the leading recommendation with a strong preference", () => {
@@ -268,5 +341,93 @@ describe("planTrip", () => {
     expect(result.costs.totalWon).toBe(0)
     expect(result.totals.walkingMeters).toBe(0)
     expect(result.warnings[0]).toContain("찾지 못했어요")
+  })
+
+  it("retimes a selected route with exact walking legs without relaxing constraints", () => {
+    const estimated = planTrip({ ...saturdayRequest, endTime: "18:00" })
+    const exactLegs = estimated.legs.map((leg) => ({
+      distanceMeters: Math.max(1, Math.round(leg.distanceMeters * 1.08)),
+      durationMinutes: Math.max(1, Math.ceil(leg.durationMinutes * 1.08)),
+    }))
+    const refined = retimeTripPlanWithWalkingLegs(
+      estimated,
+      exactLegs,
+      "https://map.kakao.com/link/by/walk/test",
+    )
+
+    expect(refined).not.toBeNull()
+    expect(refined?.legs.every((leg) => leg.provider === "kakao")).toBe(true)
+    expect(refined?.directionsUrl).toBe("https://map.kakao.com/link/by/walk/test")
+    expect(refined?.totals.walkingMeters).toBe(
+      exactLegs.reduce((total, leg) => total + leg.distanceMeters, 0),
+    )
+    expect(refined?.stops.at(-1)?.departMinute).toBeLessThanOrEqual(18 * 60)
+  })
+
+  it("rejects an exact route that violates the per-leg walking limit", () => {
+    const estimated = planTrip({ ...saturdayRequest, endTime: "14:00" })
+    expect(estimated.stops.length).toBeGreaterThan(0)
+    expect(
+      retimeTripPlanWithWalkingLegs(estimated, [
+        { distanceMeters: 2_801, durationMinutes: 45 },
+      ]),
+    ).toBeNull()
+  })
+
+  it("rebuilds stop-dependent warnings after an exact route trims the suffix", () => {
+    const estimated = planTrip({ ...saturdayRequest, endTime: "18:00" })
+    expect(estimated.stops.length).toBeGreaterThan(1)
+    const removed = estimated.stops.at(-1)!
+    const removedPlace: Place = {
+      ...removed.place,
+      category: "performance",
+      tags: ["performance"],
+      availabilityNote: "제거된 장소에만 필요한 안내",
+    }
+    const stops = estimated.stops.map((stop, index) =>
+      index === estimated.stops.length - 1
+        ? { ...stop, place: removedPlace }
+        : stop,
+    )
+    const plan: TripPlan = {
+      ...estimated,
+      request: { ...estimated.request, wants: ["performance"] },
+      stops,
+      warnings: [
+        ...estimated.warnings,
+        `${removedPlace.name}: ${removedPlace.availabilityNote}`,
+      ],
+    }
+    const exactPrefix = estimated.legs.slice(0, -1).map((leg) => ({
+      distanceMeters: leg.distanceMeters,
+      durationMinutes: leg.durationMinutes,
+    }))
+
+    const refined = retimeTripPlanWithWalkingLegs(
+      plan,
+      exactPrefix,
+      undefined,
+      stops.map((stop) => stop.place),
+    )
+
+    expect(refined).not.toBeNull()
+    expect(refined?.stops).toHaveLength(stops.length - 1)
+    expect(refined?.warnings.join(" ")).toContain("공연 장소는 포함하지 못했어요")
+    expect(refined?.warnings.join(" ")).not.toContain("제거된 장소에만 필요한 안내")
+  })
+
+  it("builds a safe empty plan when no exact walking prefix is feasible", () => {
+    const estimated = planTrip({ ...saturdayRequest, endTime: "14:00" })
+    const safe = retimeTripPlanWithWalkingLegs(estimated, [])
+
+    expect(safe).not.toBeNull()
+    expect(safe?.stops).toHaveLength(0)
+    expect(safe?.legs).toHaveLength(0)
+    expect(safe?.totals).toMatchObject({
+      durationMinutes: 0,
+      walkingMeters: 0,
+      stopCount: 0,
+    })
+    expect(safe?.warnings[0]).toContain("찾지 못했어요")
   })
 })
