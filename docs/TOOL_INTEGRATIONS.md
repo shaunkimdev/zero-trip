@@ -28,7 +28,10 @@ platform's secret manager, not in Git.
 missing or unreachable backend an explicit error instead of silently changing
 the result to demo data. Use `optional` only for an intentionally static demo,
 such as the repository's GitHub Pages workflow. This variable is public and
-contains no credential.
+contains no credential. When `optional` is set without a separate API base URL
+(an empty value or `/`), the browser skips the API request entirely and uses
+the bundled demo catalog. This is important on GitHub Pages, where POST requests
+to nonexistent API paths can return an HTML `405` response.
 
 `VITE_ZERO_TRIP_API_BASE_URL` selects the public base URL whose `api/*` routes
 reach the standalone server (default `/`). Keep tool origins on HTTPS in live

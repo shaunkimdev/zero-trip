@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { SEOUL_CLUSTER_ORIGINS } from "../data/seoul-places.ts"
 import { planTrip } from "./planner.ts"
-import { isTripPlan } from "./trip-api.ts"
+import { isTripPlan, shouldRequestTripApi } from "./trip-api.ts"
 
 function validPlan() {
   return planTrip({
@@ -203,5 +203,19 @@ describe("isTripPlan", () => {
         ),
       }),
     ).toBe(false)
+  })
+})
+
+describe("shouldRequestTripApi", () => {
+  it("skips API requests for a static optional deployment", () => {
+    expect(shouldRequestTripApi("optional", undefined)).toBe(false)
+    expect(shouldRequestTripApi("optional", "")).toBe(false)
+    expect(shouldRequestTripApi("optional", "/")).toBe(false)
+  })
+
+  it("uses a configured backend or a required same-origin API", () => {
+    expect(shouldRequestTripApi("optional", "https://api.example.com")).toBe(true)
+    expect(shouldRequestTripApi("required", "/")).toBe(true)
+    expect(shouldRequestTripApi(undefined, undefined)).toBe(true)
   })
 })

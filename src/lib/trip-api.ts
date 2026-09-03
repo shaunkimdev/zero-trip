@@ -10,11 +10,24 @@ interface TripPlanPayload {
   error?: { message?: string }
 }
 
+const configuredApiBaseUrl = import.meta.env.VITE_ZERO_TRIP_API_BASE_URL?.trim()
 const apiOptional = import.meta.env.VITE_ZERO_TRIP_API_MODE === "optional"
+const tripApiEnabled = shouldRequestTripApi(
+  import.meta.env.VITE_ZERO_TRIP_API_MODE,
+  configuredApiBaseUrl,
+)
 const REQUEST_TIMEOUT_MS = 65_000
 
+export function shouldRequestTripApi(
+  mode: ImportMetaEnv["VITE_ZERO_TRIP_API_MODE"],
+  baseUrl: string | undefined,
+) {
+  const normalizedBaseUrl = baseUrl?.trim()
+  return mode !== "optional" || Boolean(normalizedBaseUrl && normalizedBaseUrl !== "/")
+}
+
 function planEndpoint() {
-  const configuredBase = import.meta.env.VITE_ZERO_TRIP_API_BASE_URL?.trim() || "/"
+  const configuredBase = configuredApiBaseUrl || "/"
   const base = configuredBase.endsWith("/") ? configuredBase : `${configuredBase}/`
   return new URL("api/trips/plan", new URL(base, window.location.origin)).toString()
 }
@@ -311,6 +324,11 @@ export async function requestTripPlan(
   request: TripRequest,
   signal?: AbortSignal,
 ): Promise<TripPlan | null> {
+  // GitHub Pages only serves static files. In its explicit optional mode there
+  // is no API URL to call, so use the bundled demo planner without issuing a
+  // POST that Pages answers with an HTML 405 response.
+  if (!tripApiEnabled) return null
+
   const controller = new AbortController()
   const forwardAbort = () => controller.abort(signal?.reason)
   signal?.addEventListener("abort", forwardAbort, { once: true })
@@ -333,7 +351,7 @@ export async function requestTripPlan(
       throw new Error("추천 API가 배포되지 않았어요.")
     }
     if (!contentType.includes("application/json")) {
-      if (apiOptional && response.ok && contentType.includes("text/html")) return null
+      if (apiOptional) return null
       throw new Error("추천 서버에 연결하지 못했어요.")
     }
 
